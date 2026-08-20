@@ -1,64 +1,231 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en-GB">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Autumn Nails — New website coming soon</title>
+<meta name="description" content="Autumn Nails — a calm little space for you. Our new website is coming soon.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Yellowtail&family=Montserrat:wght@200;300;400&display=swap" rel="stylesheet">
 
-    <title>Coming Soon</title>
+<!-- ============================================================
+     DROP-IN PART 1 of 2 — paste this <style> block into <head>
+     ============================================================ -->
+<style>
+  :root{
+    --page:      #EDE3DA;
+    --cream:     #FDF6F0;
+    --cream-deep:#F6E7DC;
+    --blush:     #F1D8CB;
+    --peach:     #E9C2AB;
+    --clay:      #B98A6A;
+    --cocoa:     #5C2E26;
+    --cocoa-soft:#7C554A;
+    --ember:     #E08A45;
 
-    <style>
-        * {
-            box-sizing: border-box;
-        }
+    --script:'Yellowtail','Brush Script MT',cursive;
+    --sans:'Montserrat','Helvetica Neue',Arial,sans-serif;
 
-        body {
-            margin: 0;
-            font-family: Arial, Helvetica, sans-serif;
-            background: #111;
-            color: #fff;
+    /* everything scales off the smaller of width/height so the page
+       always fits the window — laptop, desktop or phone */
+    --u: min(1vw, 1.7vh);
+  }
 
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
+  *,*::before,*::after{ box-sizing:border-box; }
 
-        .holding-page {
-            text-align: center;
-            padding: 40px;
-        }
+  html,body{ height:100%; }
+  body.an-page{
+    margin:0;
+    height:100dvh;
+    overflow:hidden;
+    display:grid;
+    place-items:center;
+    padding:clamp(10px,2vmin,28px);
+    background:var(--page);
+    color:var(--cocoa-soft);
+    font-family:var(--sans);
+    -webkit-font-smoothing:antialiased;
+  }
 
-        .coming-soon {
-            display: inline-block;
-            padding: 18px 40px;
-            border: 2px solid #fff;
-            font-size: 42px;
-            font-weight: bold;
-            letter-spacing: 8px;
-            text-transform: uppercase;
-        }
+  /* ---------- card ---------- */
+  .an-card{
+    position:relative;
+    width:100%;
+    height:100%;
+    max-width:1280px;
+    display:grid;
+    place-items:center;
+    padding:clamp(20px,4vmin,64px);
+    border-radius:clamp(16px,2.4vmin,30px);
+    overflow:hidden;
+    isolation:isolate;
+    background:linear-gradient(168deg,var(--cream) 0%,#FCEFE6 46%,var(--cream-deep) 100%);
+    box-shadow:0 30px 70px -40px rgba(92,46,38,.4), 0 2px 0 rgba(255,255,255,.7) inset;
+  }
 
-        .message {
-            margin-top: 25px;
-            font-size: 18px;
-            color: #aaa;
-        }
-    </style>
+  /* ---------- ambient shapes ---------- */
+  .an-blobs{ position:absolute; inset:-10%; z-index:-1; pointer-events:none; }
+  .an-blobs svg{ width:100%; height:100%; display:block; }
+  .an-blobs path,.an-blobs ellipse{ mix-blend-mode:multiply; }
+  .an-drift-a{ animation:an-drift 28s ease-in-out infinite; transform-origin:60% 40%; }
+  .an-drift-b{ animation:an-drift 36s ease-in-out infinite reverse; transform-origin:30% 70%; }
+  @keyframes an-drift{
+    0%,100%{ transform:translate3d(0,0,0) scale(1); }
+    50%    { transform:translate3d(1.2%,-1.4%,0) scale(1.03); }
+  }
+
+  .an-sparkle{
+    position:absolute; z-index:-1;
+    width:9px; height:9px; opacity:0;
+    background:radial-gradient(circle,#fff 0%,rgba(255,255,255,0) 62%);
+    animation:an-twinkle 8s ease-in-out infinite;
+  }
+  .an-sparkle::before{
+    content:""; position:absolute; inset:0;
+    background:
+      linear-gradient(to right,transparent 46%,rgba(255,255,255,.95) 50%,transparent 54%),
+      linear-gradient(to bottom,transparent 46%,rgba(255,255,255,.95) 50%,transparent 54%);
+  }
+  .an-s1{ top:15%; left:79%; animation-delay:.6s; }
+  .an-s2{ top:33%; left:89%; width:6px; height:6px; animation-delay:3s; }
+  .an-s3{ top:72%; left:13%; width:7px; height:7px; animation-delay:5s; }
+  @keyframes an-twinkle{
+    0%,90%,100%{ opacity:0; transform:scale(.6); }
+    94%        { opacity:.85; transform:scale(1); }
+  }
+
+  /* ---------- content ---------- */
+  .an-stack{ text-align:center; max-width:46rem; }
+
+  /* ----- logo lockup ----- */
+  .an-logo{
+    position:relative;
+    display:inline-block;
+    margin:0 0 calc(var(--u) * 4.6);
+  }
+  .an-wordmark{
+    display:block;
+    font-family:var(--script);
+    font-size:clamp(2rem, calc(var(--u) * 5.4), 3.9rem);
+    line-height:1;
+    color:var(--cocoa);
+    white-space:nowrap;
+  }
+  /* the "A" is oversized, as in the mark */
+  .an-cap{ font-size:1.5em; line-height:0; }
+  .an-sub{
+    display:block;
+    margin-top:calc(var(--u) * .9);
+    padding-left:5.2em;
+    font-size:clamp(.62rem, calc(var(--u) * 1.15), .95rem);
+    font-weight:300;
+    letter-spacing:.46em;
+    color:var(--cocoa);
+  }
+
+  /* ----- headline ----- */
+  .an-headline{
+    margin:0;
+    font-family:var(--script);
+    font-weight:400;
+    font-size:clamp(2.6rem, calc(var(--u) * 9.4), 6.4rem);
+    line-height:1.04;
+    color:var(--cocoa);
+  }
+
+  .an-rule{
+    width:min(420px,70%);
+    height:1px;
+    margin:calc(var(--u) * 2.6) auto;
+    border:0;
+    background:linear-gradient(to right,transparent,rgba(185,138,106,.62),transparent);
+  }
+
+  .an-tagline{
+    margin:0;
+    font-size:clamp(.85rem, calc(var(--u) * 2), 1.45rem);
+    font-weight:300;
+    font-variant:small-caps;
+    letter-spacing:.14em;
+    color:var(--clay);
+  }
+
+  .an-note{
+    margin:calc(var(--u) * 4.4) 0 0;
+    font-size:clamp(.78rem, calc(var(--u) * 1.4), .98rem);
+    font-weight:300;
+    line-height:1.8;
+    letter-spacing:.03em;
+    color:var(--cocoa-soft);
+  }
+
+  /* ---------- entrance ---------- */
+  .an-rise{ opacity:0; transform:translateY(14px); animation:an-rise .95s cubic-bezier(.2,.7,.25,1) forwards; }
+  .an-d1{ animation-delay:.10s; } .an-d2{ animation-delay:.34s; }
+  .an-d3{ animation-delay:.56s; } .an-d4{ animation-delay:.76s; }
+  @keyframes an-rise{ to{ opacity:1; transform:none; } }
+
+  /* short/landscape phones: tighten so nothing clips */
+  @media (max-height:430px){
+    .an-note{ display:none; }
+    .an-logo{ margin-bottom:calc(var(--u) * 3); }
+  }
+
+  @media (prefers-reduced-motion:reduce){
+    .an-rise,.an-drift-a,.an-drift-b,.an-sparkle{ animation:none; opacity:1; transform:none; }
+    .an-sparkle{ opacity:.45; }
+  }
+</style>
 </head>
 
-<body>
+<body class="an-page">
 
-    <main class="holding-page">
+<!-- ============================================================
+     DROP-IN PART 2 of 2 — paste this <main> block into <body>
+     (and add class="an-page" to your <body> tag)
+     ============================================================ -->
+<main class="an-card">
 
-        <div class="coming-soon">
-            Coming Soon
-        </div>
+  <div class="an-blobs" aria-hidden="true">
+    <svg viewBox="0 0 1200 620" preserveAspectRatio="xMidYMid slice">
+      <g class="an-drift-a" fill="#F1D8CB" opacity=".76">
+        <path d="M-40 118C160 46 322 148 470 120 618 92 742 8 900 26c158 18 254 96 340 78v-160H-40Z"/>
+        <path d="M1240 470c-180 26-286-56-430-40-144 16-228 108-372 96-144-12-232-96-478-58v172h1280Z"/>
+      </g>
+      <g class="an-drift-b" fill="#E9C2AB" opacity=".46">
+        <path d="M-60 300c150 62 268-24 404-6 136 18 210 122 358 108 148-14 226-118 380-92 60 10 118 34 158 62v268H-60Z"/>
+      </g>
+      <g class="an-drift-b" fill="#F6DCCB" opacity=".8">
+        <ellipse cx="1050" cy="200" rx="300" ry="220"/>
+      </g>
+    </svg>
+  </div>
 
-        <div class="message">
-            Our new website is currently under construction.
-        </div>
+  <span class="an-sparkle an-s1" aria-hidden="true"></span>
+  <span class="an-sparkle an-s2" aria-hidden="true"></span>
+  <span class="an-sparkle an-s3" aria-hidden="true"></span>
 
-    </main>
+  <div class="an-stack">
+
+    <div class="an-logo an-rise an-d1" role="img" aria-label="Autumn Nails">
+      <span class="an-wordmark" aria-hidden="true"><span class="an-cap">A</span>utumn</span>
+      <span class="an-sub" aria-hidden="true">nails</span>
+    </div>
+
+    <h1 class="an-headline an-rise an-d2">Coming&nbsp;Soon</h1>
+
+    <hr class="an-rule an-rise an-d3">
+
+    <p class="an-tagline an-rise an-d3">A Calm Little Space for You</p>
+
+    <p class="an-note an-rise an-d4">
+      Our new website is on its way.<br>
+      Everything else carries on as normal in the meantime.
+    </p>
+
+  </div>
+</main>
 
 </body>
 </html>
