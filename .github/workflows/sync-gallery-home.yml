@@ -31,7 +31,14 @@ jobs:
 
           path = Path('index.html')
           text = path.read_text(encoding='utf-8')
-          with urllib.request.urlopen(os.environ['API_URL'], timeout=20) as response:
+          request = urllib.request.Request(
+              os.environ['API_URL'],
+              headers={
+                  'Origin': 'https://autumnnails.com',
+                  'User-Agent': 'Autumn-Nails-Gallery-Sync/1.0'
+              }
+          )
+          with urllib.request.urlopen(request, timeout=20) as response:
               data = json.load(response)
 
           slides = []
