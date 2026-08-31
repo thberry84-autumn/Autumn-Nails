@@ -1,0 +1,18 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "autumn-nails-booking",
+  "main": "cloudflare-booking-worker/src/index.js",
+  "compatibility_date": "2026-08-31",
+  "workers_dev": true,
+  "vars": {
+    "BOOKING_PUBLIC_URL": "https://autumn-nails-booking.thberry84.workers.dev"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "autumn-nails-booking",
+      "database_id": "b89756f2-4282-4af0-908a-095b130f5f97",
+      "migrations_dir": "cloudflare-booking-worker/migrations"
+    }
+  ]
+}
