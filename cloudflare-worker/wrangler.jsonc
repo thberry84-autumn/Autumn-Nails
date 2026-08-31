@@ -4,6 +4,12 @@
   "main": "src/index.js",
   "compatibility_date": "2026-08-31",
   "workers_dev": true,
+  "r2_buckets": [
+    {
+      "binding": "NAIL_IMAGES",
+      "bucket_name": "autumn-nails-images"
+    }
+  ],
   "secrets": {
     "required": ["GITHUB_TOKEN"]
   }
