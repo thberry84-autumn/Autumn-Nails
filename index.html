@@ -138,11 +138,20 @@ h2{font-family:Georgia,"Times New Roman",serif;font-size:clamp(2.4rem,4vw,4.7rem
 .placeholder::before{
   content:"PLACEHOLDER";position:absolute;top:14px;left:14px;font-size:.52em;letter-spacing:.18em;color:#b28c80
 }
-.gallery{display:grid;grid-template-columns:repeat(5,1fr);gap:14px}
-.gallery .placeholder{aspect-ratio:.78;border-radius:28px;padding:20px}
-.gallery .placeholder:nth-child(odd){background:linear-gradient(155deg,#f3ded0,#d9a286)}
-.gallery .placeholder:nth-child(even){background:linear-gradient(155deg,#ead9ca,#b9b69d)}
-.gallery-title{position:absolute;left:16px;bottom:18px;color:white;text-shadow:0 1px 8px rgba(50,30,20,.3);letter-spacing:0;text-transform:none;font-family:Georgia,serif;font-size:1.1rem}
+.gallery{position:relative;display:grid;grid-template-columns:1fr;gap:14px}
+.gallery-carousel{position:relative;overflow:hidden;border-radius:28px;background:var(--paper2);box-shadow:var(--shadow)}
+.gallery-track{display:flex;transition:transform .65s ease;will-change:transform}
+.gallery-slide{position:relative;min-width:100%;aspect-ratio:2.45/1;overflow:hidden;background:#ead9ca}
+.gallery-slide img{display:block;width:100%;height:100%;object-fit:cover;object-position:center}
+.gallery-slide::after{content:"";position:absolute;inset:0;background:linear-gradient(to top,rgba(60,35,28,.34),transparent 42%);pointer-events:none}
+.gallery-title{position:absolute;z-index:2;left:24px;bottom:22px;color:white;text-shadow:0 1px 10px rgba(50,30,20,.35);font-family:Georgia,serif;font-size:1.35rem}
+.gallery-controls{position:absolute;z-index:3;right:20px;bottom:18px;display:flex;gap:8px}
+.gallery-arrow{width:42px;height:42px;border:1px solid rgba(255,255,255,.7);border-radius:50%;background:rgba(255,250,246,.9);color:var(--ink);display:grid;place-items:center;cursor:pointer;box-shadow:0 8px 20px rgba(70,40,30,.12)}
+.gallery-arrow:hover{background:#fff}
+.gallery-arrow:focus-visible,.gallery-dot:focus-visible{outline:2px solid var(--terracotta);outline-offset:3px}
+.gallery-dots{display:flex;justify-content:center;gap:8px;margin-top:16px}
+.gallery-dot{width:9px;height:9px;padding:0;border:0;border-radius:50%;background:rgba(100,52,45,.22);cursor:pointer}
+.gallery-dot.active{background:var(--terracotta);transform:scale(1.18)}
 .services-grid{display:grid;grid-template-columns:.8fr 1.2fr;gap:70px;align-items:start}
 .services-copy p{color:var(--ink2);line-height:1.85}
 .service-list{border-top:1px solid var(--line)}
@@ -195,11 +204,11 @@ footer{padding:50px 0 70px;border-top:1px solid var(--line)}
   .hero,.services-grid,.studio-grid,.booking-grid,.faq-grid{grid-template-columns:1fr}
   .hero{padding-top:70px}
   .hero-art{min-height:500px}
-  .gallery{grid-template-columns:repeat(2,1fr)}
   .featurebar .wrap{grid-template-columns:repeat(2,1fr)}
   .feature:nth-child(2){border-right:0}
   .section-head{display:block}
   .section-head p{margin-top:18px}
+  .gallery-slide{aspect-ratio:1.35/1}
 }
 @media(max-width:560px){
   .wrap{width:min(100% - 22px,1180px)}
@@ -212,13 +221,18 @@ footer{padding:50px 0 70px;border-top:1px solid var(--line)}
   .bottle{transform:scale(.78);transform-origin:left top}
   .swatches{transform:scale(.72) rotate(-4deg);transform-origin:right bottom}
   .cardlabel{font-size:.8rem;padding:13px 16px}
-  .gallery{grid-template-columns:1fr}
   .featurebar .wrap{grid-template-columns:1fr}
   .feature{border-right:0;border-bottom:1px solid rgba(255,255,255,.13)}
   .section{padding:72px 0}
   .times{grid-template-columns:repeat(2,1fr)}
+  .gallery-slide{aspect-ratio:.88/1}
+  .gallery-title{left:18px;bottom:18px;font-size:1.1rem}
+  .gallery-controls{right:14px;bottom:14px}
   .footer-grid{display:block}
   .footer-links{margin-top:25px;flex-wrap:wrap}
+}
+@media(prefers-reduced-motion:reduce){
+  .gallery-track{transition:none}
 }
 </style>
 </head>
@@ -274,14 +288,26 @@ footer{padding:50px 0 70px;border-top:1px solid var(--line)}
           <div class="kicker">Fresh from the nail desk</div>
           <h2>Recent sets</h2>
         </div>
-        <p>These are placeholders for the live Instagram feed. The finished site can automatically show the newest work here while retaining the same layout.</p>
+        <p>A little look at recent Autumn Nails work. More sets can be added to the carousel as the gallery grows.</p>
       </div>
-      <div class="gallery">
-        <div class="placeholder"><span class="gallery-title">Warm cinnamon</span></div>
-        <div class="placeholder"><span class="gallery-title">Soft French</span></div>
-        <div class="placeholder"><span class="gallery-title">Olive & clay</span></div>
-        <div class="placeholder"><span class="gallery-title">Rose glaze</span></div>
-        <div class="placeholder"><span class="gallery-title">Seasonal detail</span></div>
+      <div class="gallery" aria-label="Recent nail sets carousel">
+        <div class="gallery-carousel" id="nailCarousel">
+          <div class="gallery-track" id="nailTrack">
+            <div class="gallery-slide">
+              <img src="/images/nails/IMG_5889.jpeg" alt="Recent Autumn Nails set">
+              <div class="gallery-title">Recent set</div>
+            </div>
+            <div class="gallery-slide">
+              <img src="/images/nails/IMG_5892.jpeg" alt="Recent Autumn Nails set">
+              <div class="gallery-title">Recent set</div>
+            </div>
+          </div>
+          <div class="gallery-controls">
+            <button class="gallery-arrow" type="button" id="nailPrev" aria-label="Previous nail set">‹</button>
+            <button class="gallery-arrow" type="button" id="nailNext" aria-label="Next nail set">›</button>
+          </div>
+        </div>
+        <div class="gallery-dots" id="nailDots" aria-label="Choose a nail set"></div>
       </div>
     </div>
   </section>
@@ -361,5 +387,47 @@ footer{padding:50px 0 70px;border-top:1px solid var(--line)}
     <div class="footer-links"><a href="#recent">Recent nails</a><a href="#services">Services</a><a href="#booking">Booking</a><a href="#faqs">FAQs</a></div>
   </div>
 </footer>
+<script>
+(function(){
+  const track=document.getElementById('nailTrack');
+  const dots=document.getElementById('nailDots');
+  const prev=document.getElementById('nailPrev');
+  const next=document.getElementById('nailNext');
+  const carousel=document.getElementById('nailCarousel');
+  if(!track||!dots||!prev||!next||!carousel)return;
+  const slides=Array.from(track.children);
+  let index=0;
+  let timer=null;
+  const reduced=window.matchMedia('(prefers-reduced-motion: reduce)');
+
+  slides.forEach((_,i)=>{
+    const dot=document.createElement('button');
+    dot.type='button';
+    dot.className='gallery-dot'+(i===0?' active':'');
+    dot.setAttribute('aria-label','Show nail set '+(i+1));
+    dot.addEventListener('click',()=>{goTo(i);restart();});
+    dots.appendChild(dot);
+  });
+
+  function goTo(nextIndex){
+    index=(nextIndex+slides.length)%slides.length;
+    track.style.transform='translateX(-'+(index*100)+'%)';
+    dots.querySelectorAll('.gallery-dot').forEach((dot,i)=>dot.classList.toggle('active',i===index));
+  }
+  function start(){
+    if(reduced.matches||slides.length<2)return;
+    clearInterval(timer);
+    timer=setInterval(()=>goTo(index+1),5000);
+  }
+  function restart(){start();}
+  prev.addEventListener('click',()=>{goTo(index-1);restart();});
+  next.addEventListener('click',()=>{goTo(index+1);restart();});
+  carousel.addEventListener('mouseenter',()=>clearInterval(timer));
+  carousel.addEventListener('mouseleave',start);
+  carousel.addEventListener('focusin',()=>clearInterval(timer));
+  carousel.addEventListener('focusout',e=>{if(!carousel.contains(e.relatedTarget))start();});
+  start();
+})();
+</script>
 </body>
 </html>
