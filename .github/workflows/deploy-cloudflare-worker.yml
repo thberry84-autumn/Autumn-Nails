@@ -29,34 +29,19 @@ jobs:
           command: deploy
 
       - name: Set Worker secrets
-        uses: cloudflare/wrangler-action@v4
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: cloudflare-worker
-          command: secret put ADMIN_EMAIL
-          secrets: |
-            ADMIN_EMAIL
-            ${{ secrets.AUTUMN_ADMIN_EMAIL }}
-
-      - name: Set Worker admin password
-        uses: cloudflare/wrangler-action@v4
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: cloudflare-worker
-          command: secret put ADMIN_PASSWORD
-          secrets: |
-            ADMIN_PASSWORD
-            ${{ secrets.AUTUMN_ADMIN_PASSWORD }}
-
-      - name: Set Worker session secret
-        uses: cloudflare/wrangler-action@v4
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: cloudflare-worker
-          command: secret put SESSION_SECRET
-          secrets: |
-            SESSION_SECRET
-            ${{ secrets.AUTUMN_SESSION_SECRET }}
+        working-directory: cloudflare-worker
+        env:
+          ADMIN_EMAIL: ${{ secrets.AUTUMN_ADMIN_EMAIL }}
+          ADMIN_PASSWORD: ${{ secrets.AUTUMN_ADMIN_PASSWORD }}
+          SESSION_SECRET: ${{ secrets.AUTUMN_SESSION_SECRET }}
+        run: |
+          printf '%s' "$ADMIN_EMAIL" | npx wrangler secret put ADMIN_EMAIL
+          printf '%s' "$ADMIN_PASSWORD" | npx wrangler secret put ADMIN_PASSWORD
+          printf '%s' "$SESSION_SECRET" | npx wrangler secret put SESSION_SECRET
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          ADMIN_EMAIL: ${{ secrets.AUTUMN_ADMIN_EMAIL }}
+          ADMIN_PASSWORD: ${{ secrets.AUTUMN_ADMIN_PASSWORD }}
+          SESSION_SECRET: ${{ secrets.AUTUMN_SESSION_SECRET }}
