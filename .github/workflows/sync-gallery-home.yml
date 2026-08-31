@@ -26,12 +26,12 @@ jobs:
           API_URL: https://autumn-nails-upload.thberry84.workers.dev/api/gallery
         run: |
           python - <<'PY'
-          import json, html, re, urllib.request
+          import json, html, re, urllib.request, os
           from pathlib import Path
 
           path = Path('index.html')
           text = path.read_text(encoding='utf-8')
-          with urllib.request.urlopen('${API_URL}', timeout=20) as response:
+          with urllib.request.urlopen(os.environ['API_URL'], timeout=20) as response:
               data = json.load(response)
 
           slides = []
