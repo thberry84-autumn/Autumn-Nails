@@ -96,7 +96,7 @@ async function uploadFiles(request, env, origin) {
     if (!/^image\/(jpeg|png|webp)$/.test(file.type)) return json({ error: `${file.name} is not a supported image type.` }, 400, origin);
     if (file.size > MAX_FILE_SIZE) return json({ error: `${file.name} is larger than 8 MB.` }, 400, origin);
     const filename = makeFilename(file.name);
-    await env.NAIL_IMAGES.put(filename, file.stream(), {
+    await env.BUCKET.put(filename, file.stream(), {
       httpMetadata: {
         contentType: file.type,
         cacheControl: "public, max-age=31536000, immutable"
@@ -111,7 +111,7 @@ async function uploadFiles(request, env, origin) {
 
 async function serveImage(filename, env, origin) {
   if (!/^[\w .()\-]+\.(jpe?g|png|webp)$/i.test(filename)) return new Response("Not found", { status: 404, headers: corsHeaders(origin) });
-  const object = await env.NAIL_IMAGES.get(filename);
+  const object = await env.BUCKET.get(filename);
   if (!object) return new Response("Not found", { status: 404, headers: corsHeaders(origin) });
   const headers = new Headers(corsHeaders(origin));
   object.writeHttpMetadata(headers);
@@ -122,7 +122,7 @@ async function serveImage(filename, env, origin) {
 
 async function listGallery(env) {
   const captions = await getCaptions(env);
-  const listed = await env.NAIL_IMAGES.list({ limit: 1000 });
+  const listed = await env.BUCKET.list({ limit: 1000 });
   return listed.objects
     .filter(o => /\.(jpe?g|png|webp)$/i.test(o.key))
     .sort((a, b) => b.key.localeCompare(a.key))
@@ -131,9 +131,9 @@ async function listGallery(env) {
 
 async function deleteFile(filename, env, origin) {
   if (!/^[\w .()\-]+\.(jpe?g|png|webp)$/i.test(filename)) return json({ error: "Invalid filename." }, 400, origin);
-  const existing = await env.NAIL_IMAGES.head(filename);
+  const existing = await env.BUCKET.head(filename);
   if (!existing) return json({ error: "Photo not found." }, 404, origin);
-  await env.NAIL_IMAGES.delete(filename);
+  await env.BUCKET.delete(filename);
   const captions = await getCaptions(env);
   delete captions[filename];
   await saveCaptions(captions, env);
