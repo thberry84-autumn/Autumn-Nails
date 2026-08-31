@@ -31,6 +31,8 @@ jobs:
       - name: Set Worker secrets
         working-directory: cloudflare-worker
         env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           ADMIN_EMAIL: ${{ secrets.AUTUMN_ADMIN_EMAIL }}
           ADMIN_PASSWORD: ${{ secrets.AUTUMN_ADMIN_PASSWORD }}
           SESSION_SECRET: ${{ secrets.AUTUMN_SESSION_SECRET }}
@@ -38,10 +40,3 @@ jobs:
           printf '%s' "$ADMIN_EMAIL" | npx wrangler secret put ADMIN_EMAIL
           printf '%s' "$ADMIN_PASSWORD" | npx wrangler secret put ADMIN_PASSWORD
           printf '%s' "$SESSION_SECRET" | npx wrangler secret put SESSION_SECRET
-        shell: bash
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          ADMIN_EMAIL: ${{ secrets.AUTUMN_ADMIN_EMAIL }}
-          ADMIN_PASSWORD: ${{ secrets.AUTUMN_ADMIN_PASSWORD }}
-          SESSION_SECRET: ${{ secrets.AUTUMN_SESSION_SECRET }}
