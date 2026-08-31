@@ -21,37 +21,34 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Update homepage gallery from Cloudflare
-        env:
-          API_URL: https://autumn-nails-upload.thberry84.workers.dev/api/gallery
+      - name: Update homepage gallery from GitHub images
         run: |
           python - <<'PY'
-          import json, html, re, urllib.request, os
+          import json, html, re
           from pathlib import Path
 
           path = Path('index.html')
           text = path.read_text(encoding='utf-8')
-          request = urllib.request.Request(
-              os.environ['API_URL'],
-              headers={
-                  'Origin': 'https://autumnnails.com',
-                  'User-Agent': 'Autumn-Nails-Gallery-Sync/1.0'
-              }
-          )
-          with urllib.request.urlopen(request, timeout=20) as response:
-              data = json.load(response)
+
+          captions_path = Path('images/nails/captions.json')
+          try:
+              captions = json.loads(captions_path.read_text(encoding='utf-8')) if captions_path.exists() else {}
+          except Exception:
+              captions = {}
+
+          image_files = [
+              p for p in Path('images/nails').iterdir()
+              if p.is_file() and re.search(r'\.(jpe?g|png|webp)$', p.name, re.I)
+          ]
+          image_files.sort(key=lambda p: p.name, reverse=True)
 
           slides = []
-          files = sorted(data.get('files', []), key=lambda item: str(item.get('name', '')), reverse=True)
-          for item in files:
-              name = str(item.get('name', ''))
-              url = str(item.get('url', ''))
-              caption = str(item.get('caption', '')).strip()
-              if not url or not re.search(r'\.(jpe?g|png|webp)$', name, re.I):
-                  continue
+          for image in image_files:
+              filename = image.name
+              caption = str(captions.get(filename, '')).strip()
               title = html.escape(caption or 'Recent set', quote=True)
-              safe_url = html.escape(url, quote=True)
-              slides.append(f'<div class="gallery-slide"><img src="{safe_url}" alt="{title}"><div class="gallery-title">{title}</div></div>')
+              safe_src = html.escape(f'images/nails/{filename}', quote=True)
+              slides.append(f'<div class="gallery-slide"><img src="{safe_src}" alt="{title}"><div class="gallery-title">{title}</div></div>')
 
           if not slides:
               slides = ['<div class="gallery-slide"><div class="gallery-title">No recent sets yet</div></div>']
