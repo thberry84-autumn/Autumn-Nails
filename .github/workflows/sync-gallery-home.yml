@@ -1,0 +1,72 @@
+name: Sync gallery to homepage
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'images/nails/**'
+      - '.github/workflows/sync-gallery-home.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Update homepage gallery
+        env:
+          API_URL: https://autumn-nails-upload.thberry84.workers.dev/api/gallery
+        run: |
+          python - <<'PY'
+          import json, os, re, urllib.request
+          from pathlib import Path
+
+          path = Path('index.html')
+          text = path.read_text(encoding='utf-8')
+          with urllib.request.urlopen(os.environ['API_URL'], timeout=20) as r:
+              data = json.load(r)
+
+          slides = []
+          for f in data.get('files', []):
+              caption = (f.get('caption') or '').strip()
+              url = f.get('url') or ''
+              if not url:
+                  continue
+              title = caption or 'Recent set'
+              slides.append(f'<div class="gallery-slide"><img src="{url}" alt="{title}"><div class="gallery-title">{title}</div></div>')
+
+          if not slides:
+              slides = ['<div class="gallery-slide"><div class="gallery-title">No recent sets yet</div></div>']
+
+          new_section = '''<section class="section alt" id="recent"><div class="wrap"><div class="section-head"><div><div class="kicker">Fresh from the nail desk</div><h2>Recent sets</h2></div><p>A little look at recent Autumn Nails work. More sets can be added to the carousel as the gallery grows.</p></div><div class="gallery" aria-label="Recent nail sets carousel"><div class="gallery-carousel" id="nailCarousel"><div class="gallery-track" id="nailTrack">''' + ''.join(slides) + '''</div><div class="gallery-controls"><button class="gallery-arrow" type="button" id="nailPrev" aria-label="Previous nail set">‹</button><button class="gallery-arrow" type="button" id="nailNext" aria-label="Next nail set">›</button></div></div><div class="gallery-dots" id="nailDots" aria-label="Choose a nail set"></div></div></div></section>'''
+
+          text, n = re.subn(r'<section class="section alt" id="recent">.*?</section>', new_section, text, count=1, flags=re.S)
+          if n != 1:
+              raise SystemExit('Could not find Recent sets section in index.html')
+
+          new_script = '''<script>(function(){const track=document.getElementById('nailTrack'),dots=document.getElementById('nailDots'),prev=document.getElementById('nailPrev'),next=document.getElementById('nailNext'),carousel=document.getElementById('nailCarousel');if(!track||!dots||!prev||!next||!carousel)return;const slides=[...track.children],total=slides.length,reduced=window.matchMedia('(prefers-reduced-motion: reduce)');let index=0,timer;slides.forEach((_,i)=>{const b=document.createElement('button');b.type='button';b.className='gallery-dot';b.setAttribute('aria-label','Show nail set '+(i+1));b.addEventListener('click',()=>{goTo(i);start()});dots.appendChild(b)});function goTo(i){index=(i+total)%total;track.style.transform='translateX(-'+index*100+'%)';dots.querySelectorAll('.gallery-dot').forEach((d,n)=>d.classList.toggle('active',n===index))}function start(){if(reduced.matches||total<2)return;clearInterval(timer);timer=setInterval(()=>goTo(index+1),4500)}prev.addEventListener('click',()=>{goTo(index-1);start()});next.addEventListener('click',()=>{goTo(index+1);start()});carousel.addEventListener('mouseenter',()=>clearInterval(timer));carousel.addEventListener('mouseleave',start);carousel.addEventListener('focusin',()=>clearInterval(timer));carousel.addEventListener('focusout',e=>{if(!carousel.contains(e.relatedTarget))start()});goTo(0);start()})();</script>'''
+          text, n = re.subn(r'<script>\(function\(\)\{const track=document\.getElementById\(\'nailTrack\'.*?</script>', new_script, text, count=1, flags=re.S)
+          if n != 1:
+              raise SystemExit('Could not find gallery carousel script in index.html')
+
+          path.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Commit homepage update
+        run: |
+          git config user.name 'Autumn Nails Bot'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html
+          if git diff --cached --quiet; then
+            echo 'Homepage already up to date.'
+          else
+            git commit -m 'Sync recent nail gallery to homepage'
+            git push
+          fi
