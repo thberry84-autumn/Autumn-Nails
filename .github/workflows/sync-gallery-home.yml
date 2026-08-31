@@ -21,26 +21,29 @@ jobs:
           fetch-depth: 1
 
       - name: Update homepage gallery
-        env:
-          API_URL: https://autumn-nails-upload.thberry84.workers.dev/api/gallery
         run: |
           python - <<'PY'
-          import json, os, re, urllib.request
+          import json, html, re
           from pathlib import Path
 
           path = Path('index.html')
           text = path.read_text(encoding='utf-8')
-          with urllib.request.urlopen(os.environ['API_URL'], timeout=20) as r:
-              data = json.load(r)
+          captions_path = Path('images/nails/captions.json')
+          captions = json.loads(captions_path.read_text(encoding='utf-8')) if captions_path.exists() else {}
+
+          files = sorted(
+              [p for p in Path('images/nails').iterdir() if p.is_file() and p.suffix.lower() in {'.jpg', '.jpeg', '.png', '.webp'}],
+              key=lambda p: p.name,
+              reverse=True,
+          )
 
           slides = []
-          for f in data.get('files', []):
-              caption = (f.get('caption') or '').strip()
-              url = f.get('url') or ''
-              if not url:
-                  continue
+          for file in files:
+              caption = str(captions.get(file.name, '')).strip()
               title = caption or 'Recent set'
-              slides.append(f'<div class="gallery-slide"><img src="{url}" alt="{title}"><div class="gallery-title">{title}</div></div>')
+              src = '/images/nails/' + html.escape(file.name, quote=True)
+              safe_title = html.escape(title, quote=True)
+              slides.append(f'<div class="gallery-slide"><img src="{src}" alt="{safe_title}"><div class="gallery-title">{safe_title}</div></div>')
 
           if not slides:
               slides = ['<div class="gallery-slide"><div class="gallery-title">No recent sets yet</div></div>']
