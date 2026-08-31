@@ -6,7 +6,7 @@
   "workers_dev": true,
   "r2_buckets": [
     {
-      "binding": "NAIL_IMAGES",
+      "binding": "BUCKET",
       "bucket_name": "autumn-nails-images"
     }
   ],
