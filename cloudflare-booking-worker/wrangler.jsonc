@@ -5,7 +5,7 @@
   "compatibility_date": "2026-08-31",
   "workers_dev": true,
   "vars": {
-    "BOOKING_PUBLIC_URL": "https://autumn-nails-booking.workers.dev"
+    "BOOKING_PUBLIC_URL": "https://autumn-nails-booking.thberry84.workers.dev"
   },
   "d1_databases": [
     {
