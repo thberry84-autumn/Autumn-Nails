@@ -3,5 +3,5 @@ main = "src/index.js"
 compatibility_date = "2026-08-31"
 
 [[r2_buckets]]
-binding = "NAIL_IMAGES"
+binding = "BUCKET"
 bucket_name = "autumn-nails-images"
