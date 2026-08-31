@@ -27,3 +27,36 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: cloudflare-worker
           command: deploy
+
+      - name: Set Worker secrets
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: cloudflare-worker
+          command: secret put ADMIN_EMAIL
+          secrets: |
+            ADMIN_EMAIL
+            ${{ secrets.AUTUMN_ADMIN_EMAIL }}
+
+      - name: Set Worker admin password
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: cloudflare-worker
+          command: secret put ADMIN_PASSWORD
+          secrets: |
+            ADMIN_PASSWORD
+            ${{ secrets.AUTUMN_ADMIN_PASSWORD }}
+
+      - name: Set Worker session secret
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: cloudflare-worker
+          command: secret put SESSION_SECRET
+          secrets: |
+            SESSION_SECRET
+            ${{ secrets.AUTUMN_SESSION_SECRET }}
