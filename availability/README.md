@@ -1,0 +1,1 @@
+Availability is managed through the private booking admin. No appointment slots are preloaded into the repository.
