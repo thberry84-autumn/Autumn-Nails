@@ -35,7 +35,8 @@ jobs:
               data = json.load(response)
 
           slides = []
-          for item in data.get('files', []):
+          files = sorted(data.get('files', []), key=lambda item: str(item.get('name', '')), reverse=True)
+          for item in files:
               name = str(item.get('name', ''))
               url = str(item.get('url', ''))
               caption = str(item.get('caption', '')).strip()
