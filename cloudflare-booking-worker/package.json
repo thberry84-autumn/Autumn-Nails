@@ -1,0 +1,14 @@
+{
+  "name": "autumn-nails-booking-worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "^1.0.0",
+    "vitest": "^4.1.0",
+    "wrangler": "^4.127.1"
+  }
+}
