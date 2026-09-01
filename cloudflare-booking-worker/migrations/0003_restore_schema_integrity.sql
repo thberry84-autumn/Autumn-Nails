@@ -1,25 +1,12 @@
 -- Restore the schema guarantees defined by migrations 0001 and 0002.
--- This migration is intentionally data-preserving: rows are copied into rebuilt
--- tables before the old tables are removed. Existing IDs and timestamps are kept.
+-- This migration is data-preserving: rows are copied into rebuilt tables before
+-- the old tables are removed. Existing IDs and timestamps are kept.
 -- The live database was audited before this migration: no duplicate
 -- availability (date, start_time) pairs were present.
 
-PRAGMA foreign_keys = OFF;
-
--- booking_events depends on bookings, so rebuild it first.
-CREATE TABLE booking_events_new (
-  id TEXT PRIMARY KEY,
-  booking_id TEXT NOT NULL,
-  event_type TEXT NOT NULL,
-  metadata_json TEXT NOT NULL DEFAULT '{}',
-  created_at TEXT NOT NULL,
-  FOREIGN KEY (booking_id) REFERENCES bookings_new(id)
-);
-INSERT INTO booking_events_new (id, booking_id, event_type, metadata_json, created_at)
-SELECT id, booking_id, event_type, metadata_json, created_at
-FROM booking_events;
-
--- Build the three tables whose CHECK constraints are missing in production.
+-- Build replacement tables first so all new foreign-key targets exist before
+-- any existing application tables are removed. This avoids disabling foreign
+-- key enforcement during the migration.
 CREATE TABLE clients_new (
   id TEXT PRIMARY KEY,
   first_name TEXT NOT NULL,
@@ -67,6 +54,18 @@ INSERT INTO bookings_new (id, slot_id, client_id, service_id, booked_service_id,
 SELECT id, slot_id, client_id, service_id, booked_service_id, date, start_time, price_pence, addons_json, status, created_at, updated_at
 FROM bookings;
 
+CREATE TABLE booking_events_new (
+  id TEXT PRIMARY KEY,
+  booking_id TEXT NOT NULL,
+  event_type TEXT NOT NULL,
+  metadata_json TEXT NOT NULL DEFAULT '{}',
+  created_at TEXT NOT NULL,
+  FOREIGN KEY (booking_id) REFERENCES bookings_new(id)
+);
+INSERT INTO booking_events_new (id, booking_id, event_type, metadata_json, created_at)
+SELECT id, booking_id, event_type, metadata_json, created_at
+FROM booking_events;
+
 -- Replace the old tables. All existing application rows have already been
 -- copied into their corresponding _new table at this point.
 DROP TABLE booking_events;
@@ -87,5 +86,3 @@ CREATE UNIQUE INDEX idx_availability_date_time_unique
 CREATE INDEX idx_bookings_client_date ON bookings(client_id, date, start_time);
 CREATE INDEX idx_bookings_status_date ON bookings(status, date, start_time);
 CREATE INDEX idx_booking_events_booking ON booking_events(booking_id, created_at);
-
-PRAGMA foreign_keys = ON;
