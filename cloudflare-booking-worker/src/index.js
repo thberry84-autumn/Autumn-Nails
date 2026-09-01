@@ -78,6 +78,8 @@ async function createBooking(request, env, origin) {
   if (!slot || slot.status !== "available") return json({ error: "That appointment is no longer available. Please choose another slot." }, 409, origin);
   const allowed = parseJson(slot.service_ids_json, []);
   if (allowed.length && !allowed.includes(serviceId)) return json({ error: "That service is not available at the selected time." }, 409, origin);
+  const nowLondon = londonDateTime();
+  if (slot.date < nowLondon.date || (slot.date === nowLondon.date && slot.start_time <= nowLondon.time)) return json({ error: "That appointment time has passed. Please choose another slot." }, 409, origin);
 
   const existingClient = await env.DB.prepare("SELECT id FROM clients WHERE email = ? LIMIT 1").bind(email).first();
   let effectiveService = service, infillChanged = false, qualifyingDate = null;
