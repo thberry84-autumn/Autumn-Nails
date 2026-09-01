@@ -1,5 +1,6 @@
 import path from "node:path";
-import { cloudflareTest, readD1Migrations } from "@cloudflare/vitest-plugin/config";
+import { cloudflareTest } from "@cloudflare/vitest-plugin";
+import { readD1Migrations } from "@cloudflare/vitest-plugin/config";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
