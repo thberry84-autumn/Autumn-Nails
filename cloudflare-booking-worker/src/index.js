@@ -48,11 +48,21 @@ function corsHeaders(origin) { return { "Access-Control-Allow-Origin": origin, "
 function json(data, status, origin, extra = {}) { return new Response(JSON.stringify(data), { status, headers: { ...corsHeaders(origin), "Content-Type": "application/json; charset=utf-8", ...extra } }); }
 function publicServices(origin) { return json({ services: SERVICES.filter(s => s.bookable), addons: SERVICES.filter(s => s.addon) }, 200, origin, { "Cache-Control": "public, max-age=300" }); }
 
+function londonDateTime() {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/London", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(new Date()).map(({ type, value }) => [type, value]));
+  return { date: `${parts.year}-${parts.month}-${parts.day}`, time: `${parts.hour}:${parts.minute}` };
+}
+
 async function publicAvailability(url, env, origin) {
   const serviceId = url.searchParams.get("service");
   if (!SERVICES.some(s => s.id === serviceId && s.bookable)) return json({ error: "Please choose a valid service." }, 400, origin);
   const result = await env.DB.prepare("SELECT id, date, start_time, service_ids_json FROM availability_slots WHERE status = 'available' AND date >= date('now', 'localtime') ORDER BY date, start_time").all();
-  const slots = (result.results || []).filter(row => { const ids = parseJson(row.service_ids_json, []); return !ids.length || ids.includes(serviceId); });
+  const now = londonDateTime();
+  const slots = (result.results || []).filter(row => {
+    if (row.date === now.date && row.start_time <= now.time) return false;
+    const ids = parseJson(row.service_ids_json, []);
+    return !ids.length || ids.includes(serviceId);
+  });
   return json({ slots }, 200, origin, { "Cache-Control": "no-store" });
 }
 
