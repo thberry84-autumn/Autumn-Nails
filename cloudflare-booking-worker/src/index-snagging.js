@@ -46,7 +46,6 @@ async function listClients(env, origin) {
   const result = await env.DB.prepare(`SELECT c.id,c.first_name,c.surname,c.email,c.phone,c.marketing_opt_in,c.created_at,c.updated_at,COUNT(b.id) AS booking_count,MAX(CASE WHEN b.status IN ('confirmed','completed') THEN b.date END) AS last_booking_date FROM clients c LEFT JOIN bookings b ON b.client_id=c.id GROUP BY c.id ORDER BY c.surname,c.first_name`).all();
   return json({ clients: result.results || [] }, 200, origin);
 }
-
 async function listFinance(env, origin) {
   const result = await env.DB.prepare(`SELECT b.id,b.date,b.start_time,b.price_pence,b.price_adjustment_pence,b.final_price_pence,b.payment_status,b.status,b.service_id,b.booked_service_id,b.addons_json,c.first_name,c.surname,c.email FROM bookings b JOIN clients c ON c.id=b.client_id ORDER BY b.date DESC,b.start_time DESC`).all();
   return json({ bookings: (result.results || []).map(row => ({ ...row, requestedService: serviceName(row.service_id), bookedService: serviceName(row.booked_service_id), addons: parseJson(row.addons_json, {}) })) }, 200, origin);
