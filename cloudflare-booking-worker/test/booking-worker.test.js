@@ -171,6 +171,19 @@ describe("admin authentication", () => {
     const blocked = await request("/api/login", { method: "POST", body: JSON.stringify({ email: "admin@example.test", password: "wrong" }) });
     expect(blocked.status).toBe(429);
   });
+
+  it("removes an available slot with booking history without deleting the history", async () => {
+    const slotId = await createSlot({ date: futureDate(15), serviceIds: ["gel-polish"] });
+    const bookingId = crypto.randomUUID(), clientId = await createClient({ email: "history@example.com" }), now = new Date().toISOString();
+    await env.DB.prepare("INSERT INTO bookings (id,slot_id,client_id,service_id,booked_service_id,date,start_time,price_pence,addons_json,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)").bind(bookingId, slotId, clientId, "gel-polish", "gel-polish", futureDate(15), "18:00", 2200, "{}", "cancelled", now, now).run();
+    const login = await request("/api/login", { method: "POST", body: JSON.stringify({ email: "admin@example.test", password: "test-password-only" }) });
+    expect(login.status).toBe(200);
+    const token = (await json(login)).token;
+    const response = await request(`/api/admin/availability/${slotId}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+    expect(response.status).toBe(200);
+    expect((await env.DB.prepare("SELECT status FROM availability_slots WHERE id=?").bind(slotId).first()).status).toBe("removed");
+    expect((await env.DB.prepare("SELECT status FROM bookings WHERE id=?").bind(bookingId).first()).status).toBe("cancelled");
+  });
 });
 
 describe("security headers", () => {
