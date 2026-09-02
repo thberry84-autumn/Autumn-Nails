@@ -202,7 +202,7 @@ async function sendBookingEmails(env, body, booking, duration) {
     infillNote
   ].filter(Boolean);
   const businessText = ["A new Autumn Nails appointment has been booked.", "", `Client: ${customerName}`, `Email: ${email}`, `Phone: ${cleanText(body.phone, 40)}`, ...details, "", `Add this appointment to your calendar: ${calendarUrl}`].join("\n");
-  const clientText = [`Hi ${firstName || "there"},", "", "Thank you for booking with Autumn Nails. Your appointment is confirmed.", "", ...details, "", `Add this appointment to your calendar: ${calendarUrl}`, "", "We look forward to seeing you!", "", "Autumn Nails"].join("\n");
+  const clientText = [`Hi ${firstName || "there"},`, "", "Thank you for booking with Autumn Nails. Your appointment is confirmed.", "", ...details, "", `Add this appointment to your calendar: ${calendarUrl}`, "", "We look forward to seeing you!", "", "Autumn Nails"].join("\n");
   const base = { from: { email: EMAIL_FROM, name: "Autumn Nails" }, replyTo: EMAIL_FROM };
   const sends = [
     env.EMAIL.send({ ...base, to: BUSINESS_EMAIL, subject: `New booking – ${customerName} – ${date}`, text: businessText }),
