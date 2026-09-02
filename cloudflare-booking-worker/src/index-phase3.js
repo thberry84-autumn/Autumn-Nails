@@ -4,7 +4,7 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
-    if (request.method === "POST" && url.pathname === "/api/admin/availability") {
+    if (request.method === "POST" && url.pathname === "/api/admin/availability" && request.headers.get("Authorization")) {
       try {
         const body = await request.clone().json();
         const date = String(body.date || "").trim();
