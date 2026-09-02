@@ -44,7 +44,7 @@ The repository does not contain Cloudflare credentials or database IDs.
 
    `npx wrangler d1 migrations apply autumn-nails-booking --remote`
 
-4. Set the Worker secrets:
+4. Set the Worker secrets in Cloudflare/Wrangler. Never commit their values to GitHub:
 
    `npx wrangler secret put ADMIN_EMAIL`
 
@@ -60,13 +60,17 @@ The repository does not contain Cloudflare credentials or database IDs.
 
 7. Add a custom Cloudflare route/domain when ready. The public site currently uses `autumnnails.com`.
 
+8. Before production, verify in the Cloudflare dashboard that the production Worker has all three required secrets configured and that no secret values are present in repository files, build logs or deployment configuration.
+
+9. Before production, verify D1 backup/recovery settings and complete a controlled restore test. Record the result without copying customer data into GitHub or other development systems.
+
 ## Privacy boundary
 
 The booking database intentionally does not contain the Autumn Nails paper consultation form or health/medical information. Those records remain separate.
 
 Marketing opt-in is stored separately from the information required to administer a booking.
 
-The privacy notice is a working draft and should be reviewed before the booking system goes live, particularly the retention schedule and final lawful-basis wording.
+The privacy notice is a working draft and should be reviewed before the booking system goes live, particularly the retention schedule, final lawful-basis wording, contact details and actual third-party processors.
 
 ## Availability model
 
@@ -85,7 +89,7 @@ Service duration is intentionally not stored in v1.
 
 The admin panel can generate a private `.ics` subscription URL. Apple supports subscribing to an iCal calendar by URL on iPhone/iPad.
 
-The feed contains only appointment date/time, customer name and booked service. It does not contain consultation or health information.
+The feed contains only appointment date/time, customer first name and booked service. It does not contain consultation or health information.
 
 ## Future phases
 

@@ -1,0 +1,37 @@
+name: Booking Worker Tests
+
+on:
+  pull_request:
+    paths:
+      - "cloudflare-booking-worker/**"
+      - ".github/workflows/test-booking-worker.yml"
+  push:
+    branches:
+      - main
+      - stabilise-v1
+    paths:
+      - "cloudflare-booking-worker/**"
+      - ".github/workflows/test-booking-worker.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cloudflare-booking-worker
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: cloudflare-booking-worker/package.json
+      - name: Install dependencies
+        run: npm install
+      - name: Run Worker tests
+        run: npm test
