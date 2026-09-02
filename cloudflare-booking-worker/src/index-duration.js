@@ -36,10 +36,13 @@ async function availabilityWithRealDurations(request, env, ctx) {
     const candidateDuration = durationForServices(serviceIds);
     const rows = await env.DB.prepare("SELECT id,date,start_time,status,booked_service_id,selected_services_json FROM bookings WHERE status IN ('confirmed','completed') AND date >= date('now','localtime')").all();
     const bookings = rows.results || [];
-    data.slots = slots.filter(slot => !bookings.some(booking => {
-      if (booking.date !== slot.date) return false;
-      return overlaps(slot.start_time, candidateDuration, booking.start_time, durationForServices(selectedServiceIds(booking)));
-    })).map(slot => ({ ...slot, durationMinutes: candidateDuration, endTime: addMinutesToTime(slot.start_time, candidateDuration) }));
+    data.slots = slots.filter(slot => {
+      if (isWeekday(slot.date) && bookings.some(booking => booking.date === slot.date)) return false;
+      return !bookings.some(booking => {
+        if (booking.date !== slot.date) return false;
+        return overlaps(slot.start_time, candidateDuration, booking.start_time, durationForServices(selectedServiceIds(booking)));
+      });
+    }).map(slot => ({ ...slot, durationMinutes: candidateDuration, endTime: addMinutesToTime(slot.start_time, candidateDuration) }));
     return jsonResponse(data, response);
   } catch (error) {
     console.error("Unable to apply duration-aware availability:", error);
@@ -52,7 +55,7 @@ async function bookWithRealDurationGuard(request, env, ctx) {
   const serviceIds = normaliseServiceIds(body.services, body.serviceId);
   const slotId = Number(body.slotId);
   const slot = await env.DB.prepare("SELECT id,date,start_time,status,removed_at FROM availability_slots WHERE id=? LIMIT 1").bind(slotId).first();
-  if (slot?.date && await clientHasWeekdayBooking(env, body, slot.date)) return corsJson({ error: "You already have an appointment booked for this weekday. Please choose another day." }, 409, request);
+  if (slot?.date && await weekdayHasBooking(env, slot.date)) return corsJson({ error: "That weekday is already fully booked. Please choose another day." }, 409, request);
   const duration = await effectiveDurationForBooking(body, serviceIds, env, slot?.date);
   if (slot && slot.status === "available" && !slot.removed_at) {
     const conflict = await bookingOverlaps(env, slot.date, slot.start_time, duration);
@@ -77,7 +80,7 @@ async function manualBookWithRealDurationGuard(request, env, ctx) {
   const serviceIds = normaliseServiceIds(body.services, body.serviceId);
   const slotId = Number(body.slotId);
   const slot = await env.DB.prepare("SELECT id,date,start_time,status,removed_at FROM availability_slots WHERE id=? LIMIT 1").bind(slotId).first();
-  if (slot?.date && await clientHasWeekdayBooking(env, body, slot.date)) return corsJson({ error: "You already have an appointment booked for this weekday. Please choose another day." }, 409, request);
+  if (slot?.date && await weekdayHasBooking(env, slot.date)) return corsJson({ error: "That weekday is already fully booked. Please choose another day." }, 409, request);
   const duration = await effectiveDurationForBooking(body, serviceIds, env, slot?.date);
   if (slot && slot.status === "available" && !slot.removed_at) {
     const conflict = await bookingOverlaps(env, slot.date, slot.start_time, duration);
@@ -109,17 +112,9 @@ async function bookingOverlaps(env, date, startTime, duration) {
   return (result.results || []).some(row => overlaps(startTime, duration, row.start_time, durationForServices(selectedServiceIds(row))));
 }
 
-async function clientHasWeekdayBooking(env, body, date) {
+async function weekdayHasBooking(env, date) {
   if (!isWeekday(date)) return false;
-  const clientId = String(body.clientId || "").trim();
-  const email = String(body.email || body.clientEmail || "").trim().toLowerCase();
-  let id = clientId;
-  if (!id && email) {
-    const client = await env.DB.prepare("SELECT id FROM clients WHERE lower(email)=? LIMIT 1").bind(email).first();
-    id = client?.id || "";
-  }
-  if (!id) return false;
-  const existing = await env.DB.prepare("SELECT id FROM bookings WHERE client_id=? AND date=? AND status IN ('confirmed','completed') LIMIT 1").bind(id, date).first();
+  const existing = await env.DB.prepare("SELECT id FROM bookings WHERE date=? AND status IN ('confirmed','completed') LIMIT 1").bind(date).first();
   return Boolean(existing);
 }
 
