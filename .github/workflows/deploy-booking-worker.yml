@@ -12,6 +12,9 @@ on:
 permissions:
   contents: read
 
+env:
+  CLOUDFLARE_ACCOUNT_ID: d94904809c2530355a903bbeb3306c03
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -24,7 +27,7 @@ jobs:
         uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: cloudflare-booking-worker
           command: d1 migrations apply autumn-nails-booking --remote
 
@@ -32,6 +35,6 @@ jobs:
         uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: cloudflare-booking-worker
           command: deploy
