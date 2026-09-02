@@ -1,0 +1,50 @@
+name: Restore admin date calendar and time wheel
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/restore-admin-pickers.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore known-good picker base
+        run: |
+          git checkout 9a769dc12c4a4bec3fd804432461f91a25b0e2fc -- admin/booking.html
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('admin/booking.html')
+          s = p.read_text()
+          needle = 'function datePickerChanged(e){const el=e.currentTarget,value=el.value;$("dateUk").value=formatUkShort(value);resetNativePicker(el,datePickerChanged,value)}'
+          addition = needle + '\nfunction openPicker(id){const el=$(id);try{if(typeof el.showPicker==="function"){el.showPicker();return}}catch{}el.focus();el.click();}'
+          if 'function openPicker(id)' not in s:
+              if needle not in s:
+                  raise SystemExit('Expected date picker handler not found')
+              s = s.replace(needle, addition, 1)
+          p.write_text(s)
+          PY
+      - name: Verify JavaScript
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          s = Path('admin/booking.html').read_text()
+          scripts = re.findall(r'<script(?:[^>]*)>(.*?)</script>', s, re.S)
+          Path('/tmp/booking.js').write_text('\n'.join(scripts))
+          PY
+          node --check /tmp/booking.js
+      - name: Commit and remove repair workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add admin/booking.html
+          git rm .github/workflows/restore-admin-pickers.yml
+          git commit -m "Restore calendar date picker and time wheel"
+          git push
