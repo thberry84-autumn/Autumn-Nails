@@ -181,7 +181,7 @@ describe("admin authentication", () => {
     const token = (await json(login)).token;
     const response = await request(`/api/admin/availability/${slotId}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
     expect(response.status).toBe(200);
-    expect((await env.DB.prepare("SELECT status FROM availability_slots WHERE id=?").bind(slotId).first()).status).toBe("removed");
+    expect((await env.DB.prepare("SELECT status,removed_at FROM availability_slots WHERE id=?").bind(slotId).first()).removed_at).toBeTruthy();
     expect((await env.DB.prepare("SELECT status FROM bookings WHERE id=?").bind(bookingId).first()).status).toBe("cancelled");
   });
 });
