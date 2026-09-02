@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "autumn-nails-booking",
-  "main": "src/index-history.js",
+  "main": "src/index-duration.js",
   "compatibility_date": "2026-08-31",
   "workers_dev": true,
   "vars": {
