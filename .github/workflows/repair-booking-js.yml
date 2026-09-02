@@ -12,14 +12,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - name: Repair escaped newlines and syntax check
+      - name: Remove stray escaped newlines and syntax check
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          import re
           p=Path('admin/booking.html')
           s=p.read_text()
-          # Convert literal backslash+n characters accidentally inserted into the inline JS
-          s=s.replace('\\\\n', '\n')
+          marker=chr(92)+'n'
+          start=s.rfind('<script>')
+          end=s.rfind('</script>')
+          assert start >= 0 and end > start, 'Inline script not found'
+          script=s[start:end]
+          # Remove only the accidental literal \n sequences at the very end of the inline script.
+          script=script.rstrip()
+          while script.endswith(marker):
+              script=script[:-len(marker)].rstrip()
+          s=s[:start]+script+'\n'+s[end:]
           p.write_text(s)
           PY
           python3 - <<'PY'
