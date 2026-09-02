@@ -92,7 +92,7 @@ describe("completed treatment history", () => {
     });
     expect(recorded.status).toBe(201);
 
-    const slot = await env.DB.prepare("INSERT INTO availability_slots (date,start_time,service_ids_json,status,created_at,updated_at) VALUES (?,?,?,?,?,?) RETURNING id").bind("2099-09-15", "12:30", JSON.stringify(["builder-infill"]), "available", new Date().toISOString(), new Date().toISOString()).first();
+    const slot = await env.DB.prepare("INSERT INTO availability_slots (date,start_time,service_ids_json,status,created_at,updated_at) VALUES (?,?,?,?,?,?) RETURNING id").bind("2026-09-15", "12:30", JSON.stringify(["builder-infill"]), "available", new Date().toISOString(), new Date().toISOString()).first();
     const booking = await request("/api/book", {
       method: "POST",
       body: JSON.stringify({ slotId: slot.id, serviceId: "builder-infill", firstName: "Infill", surname: "Client", email: "infill@example.com", phone: "07000000000", marketingOptIn: false })
