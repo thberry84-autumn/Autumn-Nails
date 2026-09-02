@@ -8,7 +8,22 @@ export default {
     const url = new URL(request.url);
     const match = url.pathname.match(/^\/calendar\/event\/([^/]+)$/);
     if (request.method === "GET" && match) return calendarChooser(decodeURIComponent(match[1]), env);
-    return phase4Worker.fetch(request, env, ctx);
+
+    const response = await phase4Worker.fetch(request, env, ctx);
+    if (request.method === "POST" && url.pathname === "/api/book" && response.status === 201) {
+      try {
+        const data = await response.clone().json();
+        if (data?.booking?.id) {
+          data.booking.calendarUrl = new URL(`/calendar/event/${encodeURIComponent(data.booking.id)}`, request.url).toString();
+          const headers = new Headers(response.headers);
+          headers.delete("Content-Encoding");
+          headers.delete("Content-Length");
+          headers.set("Content-Type", "application/json; charset=utf-8");
+          return new Response(JSON.stringify(data), { status: response.status, statusText: response.statusText, headers });
+        }
+      } catch (error) { console.error("Unable to add universal calendar URL:", error); }
+    }
+    return response;
   }
 };
 
@@ -22,7 +37,7 @@ async function calendarChooser(bookingId, env) {
   const dates = `${icsDate(row.date, row.start_time)}/${icsDate(row.date, endTime)}`;
   const icsUrl = `/calendar/event/${encodeURIComponent(id)}.ics`;
   const googleUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(`Autumn Nails – ${service}`)}&dates=${encodeURIComponent(dates)}&ctz=Europe%2FLondon&details=${encodeURIComponent(`${service} appointment at Autumn Nails.`)}&location=${encodeURIComponent(SALON_ADDRESS)}`;
-  const html = `<!doctype html><html lang="en-GB"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Add to calendar | Autumn Nails</title><style>:root{--ink:#64342d;--muted:#80584d;--cream:#fffaf6;--accent:#bf7054}*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;background:linear-gradient(135deg,#f7ebe3,#fcf5f0 46%,#f1dfd4);font-family:Arial,Helvetica,sans-serif;color:var(--ink)}main{width:min(560px,100%);background:rgba(255,250,246,.94);border:1px solid rgba(255,255,255,.9);border-radius:28px;padding:34px;box-shadow:0 24px 70px rgba(95,55,45,.12)}.brand{font:400 2rem Georgia,serif;margin-bottom:24px}.brand span{font:700 .65rem Arial,sans-serif;letter-spacing:.35em}.eyebrow{text-transform:uppercase;letter-spacing:.2em;font-size:.62rem;color:#a06b59}.title{font:400 2.35rem Georgia,serif;margin:10px 0 12px}.summary{padding:18px;border-radius:16px;background:#fff;margin:22px 0;line-height:1.7;color:var(--muted)}a{display:block;text-align:center;text-decoration:none;border-radius:999px;padding:15px 18px;margin-top:12px;font-weight:700;font-size:.7rem;letter-spacing:.12em;text-transform:uppercase}.primary{background:var(--ink);color:#fff}.secondary{background:#fff;color:var(--ink);border:1px solid rgba(100,52,45,.16)}.note{font-size:.74rem;color:#8b6a61;line-height:1.6;margin-top:20px}</style></head><body><main><div class="brand">Autumn <span>NAILS</span></div><div class="eyebrow">Your appointment</div><h1 class="title">Add it to your calendar</h1><div class="summary"><strong>${escapeHtml(service)}</strong><br>${escapeHtml(formatDate(row.date))}<br>${escapeHtml(formatTime(row.start_time))}–${escapeHtml(formatTime(endTime))}<br><br>${escapeHtml(SALON_ADDRESS)}</div><a class="primary" href="${escapeAttribute(googleUrl)}">Add to Google Calendar</a><a class="secondary" href="${escapeAttribute(icsUrl)}">Download calendar file (.ics)</a><p class="note">The calendar file works with Apple Calendar, Outlook and other calendar apps. Your appointment link only contains this appointment.</p></main></body></html>`;
+  const html = `<!doctype html><html lang="en-GB"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Add to calendar | Autumn Nails</title><style>:root{--ink:#64342d;--muted:#80584d}*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;background:linear-gradient(135deg,#f7ebe3,#fcf5f0 46%,#f1dfd4);font-family:Arial,Helvetica,sans-serif;color:var(--ink)}main{width:min(560px,100%);background:rgba(255,250,246,.94);border:1px solid rgba(255,255,255,.9);border-radius:28px;padding:34px;box-shadow:0 24px 70px rgba(95,55,45,.12)}.brand{font:400 2rem Georgia,serif;margin-bottom:24px}.brand span{font:700 .65rem Arial,sans-serif;letter-spacing:.35em}.eyebrow{text-transform:uppercase;letter-spacing:.2em;font-size:.62rem;color:#a06b59}.title{font:400 2.35rem Georgia,serif;margin:10px 0 12px}.summary{padding:18px;border-radius:16px;background:#fff;margin:22px 0;line-height:1.7;color:var(--muted)}a{display:block;text-align:center;text-decoration:none;border-radius:999px;padding:15px 18px;margin-top:12px;font-weight:700;font-size:.7rem;letter-spacing:.12em;text-transform:uppercase}.primary{background:var(--ink);color:#fff}.secondary{background:#fff;color:var(--ink);border:1px solid rgba(100,52,45,.16)}.note{font-size:.74rem;color:#8b6a61;line-height:1.6;margin-top:20px}</style></head><body><main><div class="brand">Autumn <span>NAILS</span></div><div class="eyebrow">Your appointment</div><h1 class="title">Add it to your calendar</h1><div class="summary"><strong>${escapeHtml(service)}</strong><br>${escapeHtml(formatDate(row.date))}<br>${escapeHtml(formatTime(row.start_time))}–${escapeHtml(formatTime(endTime))}<br><br>${escapeHtml(SALON_ADDRESS)}</div><a class="primary" href="${escapeAttribute(googleUrl)}">Add to Google Calendar</a><a class="secondary" href="${escapeAttribute(icsUrl)}">Download calendar file (.ics)</a><p class="note">The calendar file works with Apple Calendar, Outlook and other calendar apps. Your appointment link only contains this appointment.</p></main></body></html>`;
   return new Response(html, { status: 200, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "X-Frame-Options": "DENY", "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'" } });
 }
 
