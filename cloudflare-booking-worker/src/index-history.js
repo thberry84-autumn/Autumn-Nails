@@ -89,7 +89,7 @@ function corsHeaders(origin) { return { "Access-Control-Allow-Origin": origin, "
 function json(data,status,origin) { return new Response(JSON.stringify(data), { status, headers: { ...corsHeaders(origin), "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" } }); }
 function normaliseEmail(value) { return String(value || "").trim().toLowerCase().slice(0,254); }
 function fromB64url(value) { const s = value.replace(/-/g,"+").replace(/_/g,"/"); return new TextDecoder().decode(Uint8Array.from(atob(s+"=".repeat((4-s.length%4)%4)), c=>c.charCodeAt(0))); }
-function b64urlBytes(bytes) { let s=""; for (const byte of bytes) s+=String.fromCharCode(bytes[i]); return btoa(s).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/g,""); }
+function b64urlBytes(bytes) { let s=""; for (const byte of bytes) s+=String.fromCharCode(byte); return btoa(s).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/g,""); }
 async function sign(value,secret) { const key=await crypto.subtle.importKey("raw",new TextEncoder().encode(secret),{name:"HMAC",hash:"SHA-256"},false,["sign"]); return b64urlBytes(new Uint8Array(await crypto.subtle.sign("HMAC",key,new TextEncoder().encode(value)))); }
 function safeEqual(a,b) { if(a.length!==b.length)return false; let d=0; for(let i=0;i<a.length;i++)d|=a.charCodeAt(i)^b.charCodeAt(i); return d===0; }
 function normaliseDate(value) { const raw=String(value||"").trim(); let match=raw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/); if(match){const[,d,m,y]=match;return validDate(y,m,d)?`${y}-${m}-${d}`:"";} match=raw.match(/^(\d{4})-(\d{2})-(\d{2})$/); return match&&validDate(match[1],match[2],match[3])?raw:""; }
