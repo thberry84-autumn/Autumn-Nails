@@ -7,12 +7,6 @@
   "vars": {
     "BOOKING_PUBLIC_URL": "https://autumn-nails-booking.thberry84.workers.dev"
   },
-  "send_email": [
-    {
-      "name": "EMAIL",
-      "allowed_sender_addresses": ["bookings@autumnnails.com"]
-    }
-  ],
   "d1_databases": [
     {
       "binding": "DB",
