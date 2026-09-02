@@ -57,7 +57,7 @@ describe("Phase 3 admin availability guard", () => {
       headers: { Authorization: `Bearer ${token}` },
       body: JSON.stringify({ date: "2999-01-01", startTime: "10:00", serviceIds: [] })
     });
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(201);
     const rows = (await env.DB.prepare("SELECT date,start_time,status FROM availability_slots").all()).results;
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ date: "2999-01-01", start_time: "10:00", status: "available" });
