@@ -1,0 +1,60 @@
+name: Fix UK availability date and time controls
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/fix-availability-controls.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Update admin controls
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("admin/booking.html")
+          s = p.read_text()
+          old = '<input id="dateUk" class="date-uk" type="text" inputmode="numeric" autocomplete="off" placeholder="DD/MM/YYYY" maxlength="10" aria-describedby="dateHelp">'
+          new = '<input id="dateUk" class="date-uk" type="date" aria-describedby="dateHelp">'
+          if old not in s:
+              raise SystemExit("Expected date input was not found")
+          s = s.replace(old, new, 1)
+          old_js = 'function parseUkDate(value){const match=String(value||"").trim().match(/^(\\d{1,2})\\/(\\d{1,2})\\/(\\d{4})$/);if(!match)return null;const d=Number(match[1]),m=Number(match[2]),y=Number(match[3]),dt=new Date(Date.UTC(y,m-1,d));if(dt.getUTCFullYear()!==y||dt.getUTCMonth()!==m-1||dt.getUTCDate()!==d)return null;return `${y}-${String(m).padStart(2,"0")}-${String(d).padStart(2,"0")}`}'
+          new_js = 'function parseUkDate(value){const raw=String(value||"").trim();if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(raw))return null;const [y,m,d]=raw.split("-").map(Number),dt=new Date(Date.UTC(y,m-1,d));if(dt.getUTCFullYear()!==y||dt.getUTCMonth()!==m-1||dt.getUTCDate()!==d)return null;return raw}'
+          if old_js not in s:
+              raise SystemExit("Expected date parser was not found")
+          s = s.replace(old_js, new_js, 1)
+          old_input_handler = '$("dateUk").addEventListener("input",e=>{let v=e.target.value.replace(/\\D/g,"").slice(0,8);if(v.length>4)v=v.slice(0,2)+"/"+v.slice(2,4)+"/"+v.slice(4);else if(v.length>2)v=v.slice(0,2)+"/"+v.slice(2);e.target.value=v});'
+          if old_input_handler not in s:
+              raise SystemExit("Expected date input handler was not found")
+          s = s.replace(old_input_handler, '', 1)
+          s = s.replace('Enter the date as DD/MM/YYYY (for example, 02/09/2026).', 'Choose the date using the calendar. It will display in your UK date format (DD/MM/YY).', 1)
+          p.write_text(s)
+          PY
+
+      - name: Verify JavaScript
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          s=Path("admin/booking.html").read_text()
+          scripts=re.findall(r'<script(?:[^>]*)>(.*?)</script>',s,re.S)
+          Path('/tmp/booking.js').write_text('\n'.join(scripts))
+          PY
+          node --check /tmp/booking.js
+
+      - name: Commit and remove repair workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add admin/booking.html .github/workflows/fix-availability-controls.yml
+          git commit -m "Use UK date picker for availability" || exit 0
+          git push
