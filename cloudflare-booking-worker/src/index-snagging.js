@@ -22,6 +22,7 @@ export default {
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders(origin) });
     try {
       if (url.pathname === "/api/admin/clients" && request.method === "GET") return admin(request, env, origin, () => listClients(env, origin));
+      if (url.pathname === "/api/admin/finance" && request.method === "GET") return admin(request, env, origin, () => listFinance(env, origin));
       if (url.pathname === "/api/admin/manual-booking" && request.method === "POST") return admin(request, env, origin, () => manualBooking(request, env, origin));
       if (url.pathname.startsWith("/api/admin/bookings/") && url.pathname.endsWith("/finance") && request.method === "PATCH") {
         const id = decodeURIComponent(url.pathname.split("/")[4] || "");
@@ -36,33 +37,19 @@ export default {
 };
 
 function corsHeaders(origin) {
-  return {
-    "Access-Control-Allow-Origin": origin,
-    "Access-Control-Allow-Credentials": "true",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization",
-    "Access-Control-Allow-Methods": "GET,POST,PATCH,DELETE,OPTIONS",
-    "Vary": "Origin",
-    "X-Content-Type-Options": "nosniff",
-    "Referrer-Policy": "strict-origin-when-cross-origin",
-    "X-Frame-Options": "DENY",
-    "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
-    "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
-  };
+  return { "Access-Control-Allow-Origin": origin, "Access-Control-Allow-Credentials": "true", "Access-Control-Allow-Headers": "Content-Type, Authorization", "Access-Control-Allow-Methods": "GET,POST,PATCH,DELETE,OPTIONS", "Vary": "Origin", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "strict-origin-when-cross-origin", "X-Frame-Options": "DENY", "Permissions-Policy": "camera=(), microphone=(), geolocation=()", "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'; base-uri 'none'" };
 }
 function json(data, status, origin, extra = {}) { return new Response(JSON.stringify(data), { status, headers: { ...corsHeaders(origin), "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", ...extra } }); }
-
-async function admin(request, env, origin, handler) {
-  if (!await readSession(request, env)) return json({ error: "Not authorised." }, 401, origin);
-  return handler();
-}
+async function admin(request, env, origin, handler) { if (!await readSession(request, env)) return json({ error: "Not authorised." }, 401, origin); return handler(); }
 
 async function listClients(env, origin) {
-  const result = await env.DB.prepare(`SELECT c.id,c.first_name,c.surname,c.email,c.phone,c.marketing_opt_in,c.created_at,c.updated_at,
-    COUNT(b.id) AS booking_count,
-    MAX(CASE WHEN b.status IN ('confirmed','completed') THEN b.date END) AS last_booking_date
-    FROM clients c LEFT JOIN bookings b ON b.client_id=c.id
-    GROUP BY c.id ORDER BY c.surname,c.first_name`).all();
+  const result = await env.DB.prepare(`SELECT c.id,c.first_name,c.surname,c.email,c.phone,c.marketing_opt_in,c.created_at,c.updated_at,COUNT(b.id) AS booking_count,MAX(CASE WHEN b.status IN ('confirmed','completed') THEN b.date END) AS last_booking_date FROM clients c LEFT JOIN bookings b ON b.client_id=c.id GROUP BY c.id ORDER BY c.surname,c.first_name`).all();
   return json({ clients: result.results || [] }, 200, origin);
+}
+
+async function listFinance(env, origin) {
+  const result = await env.DB.prepare(`SELECT b.id,b.date,b.start_time,b.price_pence,b.price_adjustment_pence,b.final_price_pence,b.payment_status,b.status,b.service_id,b.booked_service_id,b.addons_json,c.first_name,c.surname,c.email FROM bookings b JOIN clients c ON c.id=b.client_id ORDER BY b.date DESC,b.start_time DESC`).all();
+  return json({ bookings: (result.results || []).map(row => ({ ...row, requestedService: serviceName(row.service_id), bookedService: serviceName(row.booked_service_id), addons: parseJson(row.addons_json, {}) })) }, 200, origin);
 }
 
 async function manualBooking(request, env, origin) {
@@ -79,12 +66,8 @@ async function manualBooking(request, env, origin) {
   if (slot.date < nowLondon.date || (slot.date === nowLondon.date && slot.start_time <= nowLondon.time)) return json({ error: "That appointment time has passed. Please choose another slot." }, 409, origin);
   const allowed = parseJson(slot.service_ids_json, []);
   if (allowed.length && !allowed.includes(serviceId)) return json({ error: "That service is not available at the selected time." }, 409, origin);
-
   const requestedService = SERVICES[serviceId];
-  let bookedServiceId = serviceId;
-  let bookedPrice = requestedService[1];
-  let infillChanged = false;
-  let qualifyingDate = null;
+  let bookedServiceId = serviceId, bookedPrice = requestedService[1], infillChanged = false, qualifyingDate = null;
   if (QUALIFYING_SERVICES[serviceId]) {
     const qualifying = await env.DB.prepare("SELECT date FROM bookings WHERE client_id=? AND service_id=? AND status='completed' ORDER BY date DESC,start_time DESC LIMIT 1").bind(clientId, QUALIFYING_SERVICES[serviceId]).first();
     qualifyingDate = qualifying?.date || null;
@@ -95,12 +78,10 @@ async function manualBooking(request, env, origin) {
       infillChanged = true;
     }
   }
-
   const addons = normaliseAddons(body.addons);
   const addonTotal = Object.entries(addons).reduce((sum, [id, qty]) => sum + ADDONS[id] * qty, 0);
   const total = bookedPrice + addonTotal;
-  const now = new Date().toISOString();
-  const bookingId = crypto.randomUUID();
+  const now = new Date().toISOString(), bookingId = crypto.randomUUID();
   const statements = [
     env.DB.prepare("UPDATE availability_slots SET status='booked',updated_at=? WHERE id=? AND status='available' AND removed_at IS NULL").bind(now, slotId),
     env.DB.prepare("INSERT INTO bookings (id,slot_id,client_id,service_id,booked_service_id,date,start_time,price_pence,addons_json,status,created_at,updated_at,price_adjustment_pence,final_price_pence,payment_status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(bookingId,slotId,clientId,serviceId,bookedServiceId,slot.date,slot.start_time,total,JSON.stringify(addons),"confirmed",now,now,0,total,"unpaid"),
@@ -119,20 +100,14 @@ async function updateFinance(id, request, env, origin) {
   if (!Number.isInteger(adjustment) || adjustment < -100000 || adjustment > 100000 || !["unpaid","paid","refunded","not-required"].includes(paymentStatus)) return json({ error: "Invalid price adjustment or payment status." }, 400, origin);
   const booking = await env.DB.prepare("SELECT id,price_pence FROM bookings WHERE id=? LIMIT 1").bind(id).first();
   if (!booking) return json({ error: "Booking not found." }, 404, origin);
-  const finalPrice = Math.max(0, booking.price_pence + adjustment);
-  const now = new Date().toISOString();
+  const finalPrice = Math.max(0, booking.price_pence + adjustment), now = new Date().toISOString();
   const result = await env.DB.prepare("UPDATE bookings SET price_adjustment_pence=?,final_price_pence=?,payment_status=?,updated_at=? WHERE id=?").bind(adjustment,finalPrice,paymentStatus,now,id).run();
   if (!result.meta.changes) return json({ error: "Booking could not be updated." }, 409, origin);
   await env.DB.prepare("INSERT INTO booking_events (id,booking_id,event_type,metadata_json,created_at) VALUES (?,?,?,?,?)").bind(crypto.randomUUID(),id,"finance_updated",JSON.stringify({adjustmentPence:adjustment,finalPricePence:finalPrice,paymentStatus}),now).run();
   return json({ ok:true, booking:{id,originalPricePence:booking.price_pence,priceAdjustmentPence:adjustment,finalPricePence:finalPrice,paymentStatus} }, 200, origin);
 }
 
-async function readSession(request, env) {
-  if (!env.SESSION_SECRET) return null;
-  const auth=request.headers.get("Authorization")||"",token=auth.startsWith("Bearer ")?auth.slice(7).trim():null;
-  if(!token)return null; const [encoded,signature]=token.split("."); if(!encoded||!signature)return null;
-  try { const payload=fromB64url(encoded); if(!safeEqual(signature,await sign(payload,env.SESSION_SECRET)))return null; const i=payload.lastIndexOf("|"),email=payload.slice(0,i),expiry=Number(payload.slice(i+1)); if(!email||!Number.isFinite(expiry)||Date.now()>expiry)return null; if(env.ADMIN_EMAIL&&email!==normaliseEmail(env.ADMIN_EMAIL))return null; return {email,expiry}; } catch{return null;}
-}
+async function readSession(request, env) { if (!env.SESSION_SECRET) return null; const auth=request.headers.get("Authorization")||"",token=auth.startsWith("Bearer ")?auth.slice(7).trim():null; if(!token)return null; const [encoded,signature]=token.split("."); if(!encoded||!signature)return null; try { const payload=fromB64url(encoded); if(!safeEqual(signature,await sign(payload,env.SESSION_SECRET)))return null; const i=payload.lastIndexOf("|"),email=payload.slice(0,i),expiry=Number(payload.slice(i+1)); if(!email||!Number.isFinite(expiry)||Date.now()>expiry)return null; if(env.ADMIN_EMAIL&&email!==normaliseEmail(env.ADMIN_EMAIL))return null; return {email,expiry}; } catch{return null;} }
 function londonDateTime(){const parts=Object.fromEntries(new Intl.DateTimeFormat("en-GB",{timeZone:"Europe/London",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hour12:false}).formatToParts(new Date()).map(({type,value})=>[type,value]));return{date:`${parts.year}-${parts.month}-${parts.day}`,time:`${parts.hour}:${parts.minute}`};}
 function daysBetween(from,to){return Math.round((Date.parse(`${to}T00:00:00Z`)-Date.parse(`${from}T00:00:00Z`))/86400000);}
 async function sign(value,secret){const key=await crypto.subtle.importKey("raw",new TextEncoder().encode(secret),{name:"HMAC",hash:"SHA-256"},false,["sign"]);return b64urlBytes(new Uint8Array(await crypto.subtle.sign("HMAC",key,new TextEncoder().encode(value))));}
@@ -142,4 +117,5 @@ function fromB64url(value){const s=value.replace(/-/g,"+").replace(/_/g,"/");ret
 function normaliseEmail(value){return String(value||"").trim().toLowerCase().slice(0,254);}
 function normaliseAddons(value){if(!value||typeof value!=="object")return{};const out={};for(const id of Object.keys(ADDONS)){const n=Math.floor(Number(value[id]||0));if(Number.isFinite(n)&&n>0)out[id]=Math.min(n,10);}return out;}
 function parseJson(value,fallback){try{const parsed=JSON.parse(value||"");return parsed ?? fallback;}catch{return fallback;}}
+function serviceName(id){return SERVICES[id]?.[0]||id;}
 function addMinutesToTime(time,minutes){const [h,m]=String(time).split(":").map(Number),total=h*60+m+minutes;return `${String(Math.floor(total/60)%24).padStart(2,"0")}:${String(total%60).padStart(2,"0")}`;}
