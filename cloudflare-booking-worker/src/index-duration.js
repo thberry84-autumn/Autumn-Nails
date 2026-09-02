@@ -13,6 +13,15 @@ export default {
 };
 
 async function availabilityWithRealDurations(request, env, ctx) {
+  const incomingUrl = new URL(request.url);
+  const requestedServices = incomingUrl.searchParams.get("services");
+  if (!incomingUrl.searchParams.get("service") && requestedServices) {
+    const firstService = requestedServices.split(",").map(value => value.trim()).find(Boolean);
+    if (firstService) {
+      incomingUrl.searchParams.set("service", firstService);
+      request = new Request(incomingUrl.toString(), request);
+    }
+  }
   const response = await bookingWorker.fetch(request, env, ctx);
   if (!response.ok) return response;
   try {
