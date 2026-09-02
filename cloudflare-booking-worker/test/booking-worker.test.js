@@ -176,7 +176,7 @@ describe("admin authentication", () => {
     const slotId = await createSlot({ date: futureDate(15), serviceIds: ["gel-polish"] });
     const bookingId = crypto.randomUUID(), clientId = await createClient({ email: "history@example.com" }), now = new Date().toISOString();
     await env.DB.prepare("INSERT INTO bookings (id,slot_id,client_id,service_id,booked_service_id,date,start_time,price_pence,addons_json,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)").bind(bookingId, slotId, clientId, "gel-polish", "gel-polish", futureDate(15), "18:00", 2200, "{}", "cancelled", now, now).run();
-    const login = await request("/api/login", { method: "POST", body: JSON.stringify({ email: "admin@example.test", password: "test-password-only" }) });
+    const login = await request("/api/login", { method: "POST", headers: { "CF-Connecting-IP": "198.51.100.24" }, body: JSON.stringify({ email: "admin@example.test", password: "test-password-only" }) });
     expect(login.status).toBe(200);
     const token = (await json(login)).token;
     const response = await request(`/api/admin/availability/${slotId}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
