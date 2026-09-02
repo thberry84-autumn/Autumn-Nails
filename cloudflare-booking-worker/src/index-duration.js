@@ -32,8 +32,12 @@ async function availabilityWithRealDurations(request, env, ctx) {
   try {
     const data = await response.clone().json();
     const slots = Array.isArray(data.slots) ? data.slots : [];
-    const serviceId = new URL(request.url).searchParams.get("service");
-    const now = new Date();
+    const params = new URL(request.url).searchParams;
+    const serviceIds = normaliseServiceIds(
+      params.get("services")?.split(","),
+      params.get("service")
+    );
+    const candidateDuration = durationForServices(serviceIds);
 
     const rows = await env.DB.prepare(
       "SELECT id,date,start_time,status,booked_service_id,selected_services_json FROM bookings WHERE status IN ('confirmed','completed') AND date >= date('now','localtime')"
@@ -41,17 +45,17 @@ async function availabilityWithRealDurations(request, env, ctx) {
 
     const bookings = rows.results || [];
     data.slots = slots.filter(slot => {
-      const candidateDuration = durationForService(serviceId);
       return !bookings.some(booking => {
         if (booking.date !== slot.date) return false;
         const ids = selectedServiceIds(booking);
         const bookedDuration = durationForServices(ids);
         return overlaps(slot.start_time, candidateDuration, booking.start_time, bookedDuration);
       });
-    }).map(slot => {
-      const durationMinutes = durationForService(serviceId);
-      return { ...slot, durationMinutes, endTime: addMinutesToTime(slot.start_time, durationMinutes) };
-    });
+    }).map(slot => ({
+      ...slot,
+      durationMinutes: candidateDuration,
+      endTime: addMinutesToTime(slot.start_time, candidateDuration)
+    }));
 
     return jsonResponse(data, response);
   } catch (error) {
@@ -134,7 +138,6 @@ async function effectiveDurationForBooking(body, serviceIds, env) {
   const ids = serviceIds.length ? serviceIds : [String(body.serviceId || "")];
   if (!ids.length) return DEFAULT_DURATION_MINUTES;
 
-  // If an infill is automatically converted to a full set, use the full-set duration.
   const email = String(body.email || "").trim().toLowerCase();
   const fallback = { "builder-infill": "builder-full-set", "builder-gel-infill": "builder-gel-full-set" };
   if (email) {
