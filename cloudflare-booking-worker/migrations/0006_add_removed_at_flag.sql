@@ -1,3 +1,3 @@
--- Compatibility migration retained after the removal flag was introduced in 0005.
--- The flag already exists in production and in fresh databases created from 0005.
--- No schema change is required here.
+-- Compatibility migration retained because 0006 has already been recorded in production.
+-- The removed_at column is created by 0005 on fresh databases, so this migration is intentionally a no-op.
+SELECT 1;
