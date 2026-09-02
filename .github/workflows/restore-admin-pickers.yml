@@ -15,6 +15,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Restore known-good picker base
         run: |
           git checkout 9a769dc12c4a4bec3fd804432461f91a25b0e2fc -- admin/booking.html
