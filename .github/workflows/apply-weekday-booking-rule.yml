@@ -20,30 +20,53 @@ jobs:
           p = Path('cloudflare-booking-worker/src/index-duration.js')
           s = p.read_text()
 
-          replacements = [
-            (
-              '  const duration = await effectiveDurationForBooking(body, serviceIds, env);\n  const slotId = Number(body.slotId);\n  const slot = await env.DB.prepare("SELECT id,date,start_time,status,removed_at FROM availability_slots WHERE id=? LIMIT 1").bind(slotId).first();\n',
-              '  const slotId = Number(body.slotId);\n  const slot = await env.DB.prepare("SELECT id,date,start_time,status,removed_at FROM availability_slots WHERE id=? LIMIT 1").bind(slotId).first();\n  if (slot?.date && await clientHasWeekdayBooking(env, body, slot.date)) {\n    return corsJson({ error: "You already have an appointment booked for this weekday. Please choose another day." }, 409, request);\n  }\n  const duration = await effectiveDurationForBooking(body, serviceIds, env, slot?.date);\n',
-            ),
-            (
-              '  const duration = await effectiveDurationForBooking(body, serviceIds, env);\n  const slotId = Number(body.slotId);\n  const slot = await env.DB.prepare("SELECT id,date,start_time,status,removed_at FROM availability_slots WHERE id=? LIMIT 1").bind(slotId).first();\n',
-              '  const slotId = Number(body.slotId);\n  const slot = await env.DB.prepare("SELECT id,date,start_time,status,removed_at FROM availability_slots WHERE id=? LIMIT 1").bind(slotId).first();\n  if (slot?.date && await clientHasWeekdayBooking(env, body, slot.date)) {\n    return corsJson({ error: "You already have an appointment booked for this weekday. Please choose another day." }, 409, request);\n  }\n  const duration = await effectiveDurationForBooking(body, serviceIds, env, slot?.date);\n',
-            ),
-            (
-              'async function effectiveDurationForBooking(body, serviceIds, env) {',
-              'async function clientHasWeekdayBooking(env, body, date) {\n  if (!isWeekday(date)) return false;\n  const clientId = String(body.clientId || "").trim();\n  const email = String(body.email || body.clientEmail || "").trim().toLowerCase();\n  let id = clientId;\n  if (!id && email) {\n    const client = await env.DB.prepare("SELECT id FROM clients WHERE lower(email)=? LIMIT 1").bind(email).first();\n    id = client?.id || "";\n  }\n  if (!id) return false;\n  const existing = await env.DB.prepare("SELECT id FROM bookings WHERE client_id=? AND date=? AND status IN ('confirmed','completed') LIMIT 1").bind(id, date).first();\n  return Boolean(existing);\n}\n\nfunction isWeekday(date) {\n  const value = String(date || "");\n  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(value)) return false;\n  const day = new Date(`${value}T12:00:00Z`).getUTCDay();\n  return day >= 1 && day <= 5;\n}\n\nasync function effectiveDurationForBooking(body, serviceIds, env, targetDate) {'
-            ),
-            (
-              'const days = qualifying?.date ? daysBetween(qualifying.date, String(body.date || "")) : null;',
-              'const days = qualifying?.date && targetDate ? daysBetween(qualifying.date, String(targetDate)) : null;'
-            ),
-          ]
+          old1 = """  const duration = await effectiveDurationForBooking(body, serviceIds, env);
+  const slotId = Number(body.slotId);
+  const slot = await env.DB.prepare(\"SELECT id,date,start_time,status,removed_at FROM availability_slots WHERE id=? LIMIT 1\").bind(slotId).first();
+"""
+          new1 = """  const slotId = Number(body.slotId);
+  const slot = await env.DB.prepare(\"SELECT id,date,start_time,status,removed_at FROM availability_slots WHERE id=? LIMIT 1\").bind(slotId).first();
+  if (slot?.date && await clientHasWeekdayBooking(env, body, slot.date)) {
+    return corsJson({ error: \"You already have an appointment booked for this weekday. Please choose another day.\" }, 409, request);
+  }
+  const duration = await effectiveDurationForBooking(body, serviceIds, env, slot?.date);
+"""
+          if s.count(old1) != 2:
+              raise SystemExit(f'Expected two booking guard locations, found {s.count(old1)}')
+          s = s.replace(old1, new1, 2)
 
-          for old, new in replacements:
-              count = s.count(old)
-              if count != 1:
-                  raise SystemExit(f'Expected exactly one match, found {count}: {old[:100]}')
-              s = s.replace(old, new, 1)
+          old2 = "async function effectiveDurationForBooking(body, serviceIds, env) {"
+          new2 = """async function clientHasWeekdayBooking(env, body, date) {
+  if (!isWeekday(date)) return false;
+  const clientId = String(body.clientId || \"\").trim();
+  const email = String(body.email || body.clientEmail || \"\").trim().toLowerCase();
+  let id = clientId;
+  if (!id && email) {
+    const client = await env.DB.prepare(\"SELECT id FROM clients WHERE lower(email)=? LIMIT 1\").bind(email).first();
+    id = client?.id || \"\";
+  }
+  if (!id) return false;
+  const existing = await env.DB.prepare(\"SELECT id FROM bookings WHERE client_id=? AND date=? AND status IN ('confirmed','completed') LIMIT 1\").bind(id, date).first();
+  return Boolean(existing);
+}
+
+function isWeekday(date) {
+  const value = String(date || \"\");
+  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(value)) return false;
+  const day = new Date(`${value}T12:00:00Z`).getUTCDay();
+  return day >= 1 && day <= 5;
+}
+
+async function effectiveDurationForBooking(body, serviceIds, env, targetDate) {"""
+          if s.count(old2) != 1:
+              raise SystemExit(f'Expected one duration function marker, found {s.count(old2)}')
+          s = s.replace(old2, new2, 1)
+
+          old3 = "const days = qualifying?.date ? daysBetween(qualifying.date, String(body.date || \"\")) : null;"
+          new3 = "const days = qualifying?.date && targetDate ? daysBetween(qualifying.date, String(targetDate)) : null;"
+          if s.count(old3) != 1:
+              raise SystemExit(f'Expected one infill date calculation, found {s.count(old3)}')
+          s = s.replace(old3, new3, 1)
 
           p.write_text(s)
           PY
