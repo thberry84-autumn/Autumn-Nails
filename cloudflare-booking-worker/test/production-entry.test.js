@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { env } from "cloudflare:workers";
-import worker from "../src/index-phase4.js";
+import worker from "../src/index-duration.js";
 
 const site = "https://autumnnails.com";
 
@@ -58,8 +58,50 @@ describe("production Worker entrypoint", () => {
 
     const body = await response.json();
     expect(body.booking.startTime).toBe("18:00");
-    expect(body.booking.endTime).toBe("20:00");
-    expect(body.booking.durationMinutes).toBe(120);
+    expect(body.booking.endTime).toBe("19:30");
+    expect(body.booking.durationMinutes).toBe(90);
     expect(body.booking.calendarUrl).toContain(`/calendar/event/${body.booking.id}.ics`);
+  });
+
+  it("allows only one booking on a weekday, regardless of client", async () => {
+    const date = futureDate(12);
+    const now = new Date().toISOString();
+    const firstSlot = await env.DB.prepare("INSERT INTO availability_slots (date,start_time,service_ids_json,status,created_at,updated_at) VALUES (?,?,?,?,?,?)")
+      .bind(date, "18:00", JSON.stringify(["gel-polish"]), "available", now, now)
+      .run();
+    const secondSlot = await env.DB.prepare("INSERT INTO availability_slots (date,start_time,service_ids_json,status,created_at,updated_at) VALUES (?,?,?,?,?,?)")
+      .bind(date, "20:00", JSON.stringify(["gel-polish"]), "available", now, now)
+      .run();
+
+    const first = await request("/api/book", {
+      method: "POST",
+      body: JSON.stringify({
+        slotId: firstSlot.meta.last_row_id,
+        serviceId: "gel-polish",
+        firstName: "Jane",
+        surname: "Smith",
+        email: "jane@example.com",
+        phone: "07123456789",
+        marketingOptIn: false,
+        addons: {}
+      })
+    });
+    expect(first.status).toBe(201);
+
+    const second = await request("/api/book", {
+      method: "POST",
+      body: JSON.stringify({
+        slotId: secondSlot.meta.last_row_id,
+        serviceId: "gel-polish",
+        firstName: "Sarah",
+        surname: "Jones",
+        email: "sarah@example.com",
+        phone: "07987654321",
+        marketingOptIn: false,
+        addons: {}
+      })
+    });
+    expect(second.status).toBe(409);
+    expect(await second.json()).toEqual({ error: "That weekday is already fully booked. Please choose another day." });
   });
 });
