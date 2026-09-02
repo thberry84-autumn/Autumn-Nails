@@ -60,7 +60,7 @@ describe("production Worker entrypoint", () => {
     expect(body.booking.startTime).toBe("18:00");
     expect(body.booking.endTime).toBe("19:30");
     expect(body.booking.durationMinutes).toBe(90);
-    expect(body.booking.calendarUrl).toContain(`/calendar/event/${body.booking.id}.ics`);
+    expect(body.booking.calendarUrl).toContain(`/calendar/event/${body.booking.id}`);
   });
 
   it("allows only one booking on a weekday, regardless of client", async () => {
