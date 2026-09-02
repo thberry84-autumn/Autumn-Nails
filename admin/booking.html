@@ -45,6 +45,5 @@ $("addSlot").onclick=async()=>{const date=parseUkDate($("dateUk").value),time=$(
 window.removeSlot=async id=>{if(!confirm("Remove this appointment space?"))return;const r=await api("/api/admin/availability/"+id,{method:"DELETE"});if(r.ok)await loadAvailability();else alert((await r.json()).error||"Could not remove slot.")};
 window.setStatus=async(id,status)=>{const message=status==="cancelled"?"Cancel this appointment?":"Mark this appointment as completed?";if(!confirm(message))return;const r=await api("/api/admin/bookings/"+id,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({status})});if(r.ok)await loadAll();else alert((await r.json()).error||"Could not update booking.")};
 $("calendarBtn").onclick=async()=>{const r=await api("/api/admin/calendar-token"),d=await r.json();$("calendar").classList.remove("hidden");$("calendar").textContent=r.ok?"Copy this into Apple Calendar: "+d.url:(d.error||"Could not create calendar link.")};check();
-\n\n
 </script>
 </body></html>
