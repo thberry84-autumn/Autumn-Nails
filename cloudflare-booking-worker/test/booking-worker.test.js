@@ -78,6 +78,23 @@ describe("public booking API", () => {
     expect(body.booking.durationMinutes).toBe(120);
   });
 
+  it("can rebook a slot after its previous booking was cancelled", async () => {
+    const slotId = await createSlot({ date: futureDate(12), serviceIds: ["gel-polish"] });
+    const firstPayload = { slotId, serviceId: "gel-polish", firstName: "Jane", surname: "Smith", email: "jane@example.com", phone: "07123456789", marketingOptIn: false };
+    const first = await request("/api/book", { method: "POST", body: JSON.stringify(firstPayload) });
+    expect(first.status).toBe(201);
+    const firstBooking = (await json(first)).booking;
+
+    await env.DB.batch([
+      env.DB.prepare("UPDATE bookings SET status='cancelled' WHERE id=?").bind(firstBooking.id),
+      env.DB.prepare("UPDATE availability_slots SET status='available' WHERE id=?").bind(slotId)
+    ]);
+
+    const second = await request("/api/book", { method: "POST", body: JSON.stringify({ ...firstPayload, email: "another@example.com" }) });
+    expect(second.status).toBe(201);
+    expect((await env.DB.prepare("SELECT id,status FROM bookings WHERE slot_id=? ORDER BY created_at").bind(slotId).all()).results).toHaveLength(2);
+  });
+
   it("cannot book the same slot twice", async () => {
     const slotId = await createSlot({ date: futureDate(12), serviceIds: ["gel-polish"] });
     const payload = { slotId, serviceId: "gel-polish", firstName: "Jane", surname: "Smith", email: "jane@example.com", phone: "07123456789", marketingOptIn: false };
