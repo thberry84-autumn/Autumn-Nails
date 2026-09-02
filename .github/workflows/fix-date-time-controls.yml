@@ -1,0 +1,75 @@
+name: Fix UK date and time controls
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/fix-date-time-controls.yml'
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch admin controls
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('admin/booking.html')
+          s = p.read_text()
+
+          old = '<div class="field"><label for="dateUk">Date</label><input id="dateUk" class="date-uk" type="date" aria-describedby="dateHelp"></div><div class="field"><label>Time</label><input id="time" type="time"></div>'
+          new = '''<div class="field"><label for="dateUk">Date</label><div class="picker-wrap"><input id="dateUk" class="picker-display" type="text" inputmode="numeric" autocomplete="off" placeholder="DD/MM/YY" aria-describedby="dateHelp" readonly><input id="datePicker" class="native-picker" type="date" tabindex="-1" aria-hidden="true"></div></div><div class="field"><label for="timeDisplay">Time</label><div class="picker-wrap"><input id="timeDisplay" class="picker-display" type="text" inputmode="numeric" autocomplete="off" placeholder="HH:MM" readonly><input id="time" class="native-picker" type="time" tabindex="-1" aria-hidden="true"></div></div>'''
+          if old not in s:
+              raise SystemExit('Expected date/time controls not found')
+          s = s.replace(old, new, 1)
+
+          old_css = '.date-uk{width:100%;border:1px solid var(--line);border-radius:13px;background:white;padding:13px;color:var(--ink);outline:none}'
+          new_css = '''.picker-wrap{position:relative}.picker-display{width:100%;border:1px solid var(--line);border-radius:13px;background:white;padding:13px;color:var(--ink);outline:none;cursor:pointer}.picker-display::placeholder{color:#b88f83}.native-picker{position:absolute;inset:0;width:100%;height:100%;opacity:0;pointer-events:none}'''
+          if old_css in s:
+              s = s.replace(old_css, new_css, 1)
+          else:
+              s = s.replace('</style>', new_css + '</style>', 1)
+
+          old_parse = '''function parseUkDate(value){const raw=String(value||"").trim();if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(raw))return null;const [y,m,d]=raw.split("-").map(Number),dt=new Date(Date.UTC(y,m-1,d));if(dt.getUTCFullYear()!==y||dt.getUTCMonth()!==m-1||dt.getUTCDate()!==d)return null;return raw}'''
+          new_parse = '''function parseUkDate(value){const raw=String(value||"").trim();const match=/^(\\d{2})\\/(\\d{2})\\/(\\d{2})$/.exec(raw);if(!match)return null;const d=Number(match[1]),m=Number(match[2]),yy=Number(match[3]),y=2000+yy,dt=new Date(Date.UTC(y,m-1,d));if(dt.getUTCFullYear()!==y||dt.getUTCMonth()!==m-1||dt.getUTCDate()!==d)return null;return `${y}-${String(m).padStart(2,"0")}-${String(d).padStart(2,"0")}`}'''
+          if old_parse not in s:
+              raise SystemExit('Expected date parser not found')
+          s = s.replace(old_parse, new_parse, 1)
+
+          marker = '$("logout").onclick=()=>{sessionStorage.removeItem("an_booking_admin");location.reload()};'
+          picker_js = '''
+function formatUkShort(iso){if(!iso)return "";const [y,m,d]=iso.split("-");return `${d}/${m}/${String(y).slice(-2)}`}
+function openPicker(id){const el=$(id);try{if(typeof el.showPicker==="function")el.showPicker();else el.click()}catch{el.focus()}}
+$("dateUk").onclick=()=>openPicker("datePicker");
+$("datePicker").onchange=()=>{$("dateUk").value=formatUkShort($("datePicker").value)};
+$("timeDisplay").onclick=()=>openPicker("time");
+$("time").onchange=()=>{$("timeDisplay").value=$("time").value||""};
+'''
+          if marker not in s:
+              raise SystemExit('Expected logout marker not found')
+          s = s.replace(marker, marker + picker_js, 1)
+
+          old_status = 'Please enter a valid date (DD/MM/YYYY) and time.'
+          s = s.replace(old_status, 'Please choose a valid date (DD/MM/YY) and time.', 1)
+          s = s.replace('Choose the date using the calendar. It will display in your UK date format (DD/MM/YY).', 'Choose the date or time using the picker. Dates are shown in UK format (DD/MM/YY).', 1)
+          p.write_text(s)
+      - name: Verify JavaScript
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          s=Path('admin/booking.html').read_text()
+          m=re.search(r'<script>(.*?)</script>',s,re.S)
+          if not m: raise SystemExit('No script found')
+          Path('/tmp/admin.js').write_text(m.group(1))
+          PY
+          node --check /tmp/admin.js
+      - name: Commit and remove repair workflow
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/fix-date-time-controls.yml
+          git add admin/booking.html
+          git commit -m 'Fix UK date display and time picker controls'
+          git push
