@@ -21,7 +21,7 @@ jobs:
           from pathlib import Path
           p = Path("admin/clients.html")
           s = p.read_text()
-          marker = "\n\n"
+          marker = "\\n\\n"
           if marker in s:
               s = s.replace(marker, "")
           p.write_text(s)
