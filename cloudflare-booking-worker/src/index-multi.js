@@ -28,7 +28,7 @@ export default {
     }
 
     if (!(request.method === "POST" && url.pathname === "/api/book")) return bookingWorker.fetch(request, env, ctx);
-    const original = await request.json();
+    const original = await request.clone().json();
     const serviceIds = normaliseServices(original.services, original.serviceId);
     if (serviceIds.length <= 1) return bookingWorker.fetch(request, env, ctx);
 
