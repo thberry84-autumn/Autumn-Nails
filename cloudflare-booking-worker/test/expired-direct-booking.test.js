@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { env } from "cloudflare:workers";
-import worker from "../src/index.js";
+import worker from "../src/index-v2.js";
 
 const site = "https://autumnnails.com";
 

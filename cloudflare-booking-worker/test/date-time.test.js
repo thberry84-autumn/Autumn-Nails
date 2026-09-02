@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { env } from "cloudflare:workers";
-import worker from "../src/index.js";
+import worker from "../src/index-v2.js";
 
 const site = "https://autumnnails.com";
 
@@ -27,6 +27,16 @@ function londonParts(date = new Date()) {
   }).formatToParts(date).map(({ type, value }) => [type, value]));
 }
 
+beforeEach(async () => {
+  await env.DB.batch([
+    env.DB.prepare("DELETE FROM booking_events"),
+    env.DB.prepare("DELETE FROM bookings"),
+    env.DB.prepare("DELETE FROM availability_slots"),
+    env.DB.prepare("DELETE FROM clients"),
+    env.DB.prepare("DELETE FROM settings"),
+  ]);
+});
+
 describe("public availability date/time handling", () => {
   it("does not expose a slot from a previous date", async () => {
     await insertSlot("2000-01-01", "18:00");
@@ -35,11 +45,15 @@ describe("public availability date/time handling", () => {
     expect((await response.json()).slots).toHaveLength(0);
   });
 
-  it("returns future dates", async () => {
+  it("returns future dates with the 2-hour duration", async () => {
     await insertSlot("2999-01-01", "18:00");
     const response = await request("/api/availability?service=builder-full-set");
     expect(response.status).toBe(200);
-    expect((await response.json()).slots).toHaveLength(1);
+    const slots = (await response.json()).slots;
+    expect(slots).toHaveLength(1);
+    expect(slots[0].start_time).toBe("18:00");
+    expect(slots[0].endTime).toBe("20:00");
+    expect(slots[0].durationMinutes).toBe(120);
   });
 
   it("does not expose an appointment earlier today in London time", async () => {

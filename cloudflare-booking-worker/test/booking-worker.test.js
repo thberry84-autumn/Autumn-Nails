@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { env } from "cloudflare:workers";
-import worker from "../src/index.js";
+import worker from "../src/index-v2.js";
 
 const site = "https://autumnnails.com";
 
@@ -65,6 +65,17 @@ describe("public booking API", () => {
     const clients = await env.DB.prepare("SELECT id,email FROM clients").all();
     expect(clients.results).toHaveLength(1);
     expect(clients.results[0].email).toBe("jane@example.com");
+  });
+
+  it("uses the 2-hour appointment duration in the booking response", async () => {
+    const date = futureDate(12);
+    const slotId = await createSlot({ date, time: "18:00", serviceIds: ["gel-polish"] });
+    const response = await request("/api/book", { method: "POST", body: JSON.stringify({ slotId, serviceId: "gel-polish", firstName: "Jane", surname: "Smith", email: "jane@example.com", phone: "07123456789" }) });
+    expect(response.status).toBe(201);
+    const body = await json(response);
+    expect(body.booking.startTime).toBe("18:00");
+    expect(body.booking.endTime).toBe("20:00");
+    expect(body.booking.durationMinutes).toBe(120);
   });
 
   it("cannot book the same slot twice", async () => {
@@ -145,7 +156,7 @@ describe("admin authentication", () => {
   });
 });
 
- describe("security headers", () => {
+describe("security headers", () => {
   it("returns baseline browser security headers", async () => {
     const response = await request("/health");
     expect(response.headers.get("X-Content-Type-Options")).toBe("nosniff");
