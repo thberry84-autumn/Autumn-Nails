@@ -1,0 +1,68 @@
+name: Fix admin time picker wheel
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/fix-time-wheel.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Replace time picker with wheel
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('admin/booking.html')
+          s=p.read_text()
+          old='''<div class="field"><label for="timeDisplay">Time</label><div class="picker-wrap"><input id="timeDisplay" class="picker-display" type="text" inputmode="numeric" autocomplete="off" placeholder="HH:MM" readonly><input id="time" class="native-picker" type="time" tabindex="-1" aria-hidden="true"></div></div>'''
+          new='''<div class="field"><label for="timeDisplay">Time</label><div class="picker-wrap"><input id="timeDisplay" class="picker-display" type="text" inputmode="numeric" autocomplete="off" placeholder="HH:MM" readonly><input id="time" class="native-picker" type="time" tabindex="-1" aria-hidden="true"><div id="timeWheel" class="time-wheel hidden" role="dialog" aria-label="Choose appointment time"><div class="time-wheel-title">Choose a time</div><div class="wheel-row"><div class="wheel-col" id="hourWheel"></div><div class="wheel-sep">:</div><div class="wheel-col" id="minuteWheel"></div><div class="wheel-col meridiem" id="ampmWheel"></div></div><div class="time-wheel-actions"><button id="timeCancel" class="btn ghost" type="button">Cancel</button><button id="timeDone" class="btn primary" type="button">Done</button></div></div></div></div>'''
+          if old not in s:
+              raise SystemExit('Time field pattern not found')
+          s=s.replace(old,new,1)
+          css='''
+          .time-wheel{position:absolute;top:calc(100% + 10px);right:0;width:min(360px,calc(100vw - 44px));padding:18px;border:1px solid var(--line);border-radius:22px;background:rgba(255,250,246,.98);box-shadow:0 24px 70px rgba(95,55,45,.2);z-index:30}.time-wheel-title{font:400 1.15rem Georgia,serif;margin-bottom:12px}.wheel-row{display:grid;grid-template-columns:1fr 18px 1fr 1fr;align-items:center;gap:6px}.wheel-col{height:150px;overflow-y:auto;scroll-snap-type:y mandatory;overscroll-behavior:contain;border:1px solid var(--line);border-radius:14px;background:white;scrollbar-width:none}.wheel-col::-webkit-scrollbar{display:none}.wheel-col::before,.wheel-col::after{content:'';display:block;height:58px}.wheel-item{height:34px;display:flex;align-items:center;justify-content:center;scroll-snap-align:center;font:400 1.05rem Georgia,serif;color:var(--ink2);cursor:pointer}.wheel-item.selected{font-size:1.2rem;font-weight:700;color:var(--ink)}.wheel-sep{font:700 1.2rem Georgia,serif;text-align:center}.time-wheel-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}.time-wheel-actions .btn{padding:10px 14px}
+          '''
+          marker='''</style>'''
+          if css.strip() not in s:
+              s=s.replace(marker,css+'\n'+marker,1)
+          start=s.index('function formatUkShort(')
+          end=s.index('async function loadServices()',start)
+          replacement='''function formatUkShort(iso){if(!iso)return "";const [y,m,d]=iso.split("-");return `${d}/${m}/${String(y).slice(-2)}`}function resetNativePicker(el,handler,value){const fresh=el.cloneNode(true);el.replaceWith(fresh);fresh.value=value||"";fresh.addEventListener("change",handler);return fresh}function datePickerChanged(e){const el=e.currentTarget,value=el.value;$("dateUk").value=formatUkShort(value);resetNativePicker(el,datePickerChanged,value)}
+          let wheelDraft="";
+          function wheelItems(id,values,current){const el=$(id);el.innerHTML=values.map(v=>`<div class="wheel-item${v===current?' selected':''}" data-value="${v}">${v}</div>`).join("");el.querySelectorAll('.wheel-item').forEach(item=>item.onclick=()=>{el.querySelectorAll('.selected').forEach(x=>x.classList.remove('selected'));item.classList.add('selected');item.scrollIntoView({block:'center',behavior:'smooth'})});}
+          function wheelValue(id){const el=$(id),box=el.getBoundingClientRect(),center=box.top+box.height/2;let best=null,dist=Infinity;el.querySelectorAll('.wheel-item').forEach(item=>{const r=item.getBoundingClientRect(),d=Math.abs((r.top+r.height/2)-center);if(d<dist){dist=d;best=item}});return best?.dataset.value||""}
+          function scrollWheelTo(id,value){const el=$(id),item=[...el.querySelectorAll('.wheel-item')].find(x=>x.dataset.value===value);if(item)item.scrollIntoView({block:'center'});}
+          function buildTimeWheel(value){const parts=String(value||"").split(":");let h=Number(parts[0]);let m=parts[1]||"00";if(!Number.isFinite(h)){h=9;m="00"}const ap=h>=12?"PM":"AM",hh=String(h%12||12).padStart(2,"0");wheelItems("hourWheel",Array.from({length:12},(_,i)=>String(i+1).padStart(2,"0")),hh);wheelItems("minuteWheel",Array.from({length:60},(_,i)=>String(i).padStart(2,"0")),m);wheelItems("ampmWheel",["AM","PM"],ap);requestAnimationFrame(()=>{scrollWheelTo("hourWheel",hh);scrollWheelTo("minuteWheel",m);scrollWheelTo("ampmWheel",ap)});}
+          function openTimeWheel(){wheelDraft=$("time").value||"09:00";buildTimeWheel(wheelDraft);$("timeWheel").classList.remove("hidden");}
+          function closeTimeWheel(){$("timeWheel").classList.add("hidden");}
+          function commitTimeWheel(){const hh=Number(wheelValue("hourWheel")),mm=Number(wheelValue("minuteWheel")),ap=wheelValue("ampmWheel");if(!hh||!Number.isFinite(mm))return;let h=hh%12;if(ap==="PM")h+=12;const value=`${String(h).padStart(2,"0")}:${String(mm).padStart(2,"0")}`;$("time").value=value;$("timeDisplay").value=timeText(value);closeTimeWheel();}
+          $("dateUk").onclick=()=>openPicker("datePicker");$("datePicker").addEventListener("change",datePickerChanged);$("timeDisplay").onclick=openTimeWheel;$("timeDone").onclick=commitTimeWheel;$("timeCancel").onclick=closeTimeWheel;document.addEventListener("click",e=>{if(!$("timeWheel").contains(e.target)&&e.target!==$("timeDisplay"))closeTimeWheel()});
+          '''
+          s=s[:start]+replacement+s[end:]
+          p.write_text(s)
+          PY
+      - name: Verify JavaScript
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          s=Path('admin/booking.html').read_text()
+          scripts=re.findall(r'<script(?:[^>]*)>(.*?)</script>',s,re.S)
+          Path('/tmp/booking.js').write_text('\n'.join(scripts))
+          PY
+          node --check /tmp/booking.js
+      - name: Commit fix and remove workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add admin/booking.html
+          git rm .github/workflows/fix-time-wheel.yml
+          git commit -m "Add spinning time picker" || exit 0
+          git push
