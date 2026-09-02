@@ -1,0 +1,39 @@
+name: Fix admin release date picker
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Replace release date field with native picker
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('admin/booking.html')
+          s = p.read_text()
+          old = '<div class="field"><label>Date</label><input id="date" type="text" inputmode="numeric" autocomplete="off" placeholder="DD/MM/YYYY" maxlength="10" aria-describedby="dateHelp"></div>'
+          new = '<div class="field"><label for="date">Date</label><input id="date" type="date" autocomplete="off" aria-describedby="dateHelp"></div>'
+          if old in s:
+              s = s.replace(old, new)
+          s = s.replace('Nothing is available to customers until you add a slot here. Every slot is 2 hours.', 'Nothing is available to customers until you add a slot here. Appointment length is calculated automatically from the services selected.')
+          s = s.replace('Use UK format: DD/MM/YYYY. Leave all services selected to make the time available for every core treatment. Past appointment times cannot be released.', 'Choose the date using the calendar picker. Past appointment times cannot be released.')
+          s = s.replace('const ukDate=$("date").value,date=parseUkDate(ukDate),time=$("time").value,serviceIds=', 'const date=$("date").value,time=$("time").value,serviceIds=')
+          s = s.replace('if(!date||!time){$("slotStatus").textContent="Please enter a valid date in DD/MM/YYYY and choose a time.";return}', 'if(!date||!time){$("slotStatus").textContent="Please choose a date and time.";return}')
+          p.write_text(s)
+          PY
+      - name: Commit fix and remove one-time workflow
+        run: |
+          rm .github/workflows/fix-admin-date-picker.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add admin/booking.html .github/workflows/fix-admin-date-picker.yml
+          git diff --cached --quiet || git commit -m "Fix admin release date picker"
+          git push
