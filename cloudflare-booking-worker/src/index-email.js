@@ -41,9 +41,16 @@ export default {
         const data = await response.clone().json();
         if (data?.booking) {
           data.booking.calendarUrl = bookingCalendarUrl(data.booking.id, env);
+          const headers = new Headers(response.headers);
+          // We replace the body, so do not carry through transport headers that
+          // could describe the original body and make browsers reject the JSON.
+          headers.delete("Content-Encoding");
+          headers.delete("Content-Length");
+          headers.set("Content-Type", "application/json; charset=utf-8");
           return new Response(JSON.stringify(data), {
             status: response.status,
-            headers: response.headers
+            statusText: response.statusText,
+            headers
           });
         }
       } catch (error) {
