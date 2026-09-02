@@ -1,6 +1,10 @@
 import bookingWorker from "./index-history.js";
 import { DEFAULT_DURATION_MINUTES, durationForServices, addMinutesToTime, overlaps } from "./duration-config.js";
 
+const BUSINESS_EMAIL = "autumnnails.uk@gmail.com";
+const EMAIL_FROM = "bookings@autumnnails.com";
+const BOOKING_LOCATION = "15 Oakwood Road, Portsmouth, PO2 9QR";
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -56,7 +60,16 @@ async function bookWithRealDurationGuard(request, env, ctx) {
   }
   const response = await bookingWorker.fetch(request, env, ctx);
   if (!response.ok) return response;
-  return replaceBookingDuration(response, duration);
+  const adjusted = await replaceBookingDuration(response, duration);
+  if (env.EMAIL) {
+    try {
+      const payload = await adjusted.clone().json();
+      if (payload?.booking?.id) ctx?.waitUntil(sendBookingEmails(env, body, payload.booking, duration));
+    } catch (error) {
+      console.error("Unable to prepare booking confirmation emails:", error);
+    }
+  }
+  return adjusted;
 }
 
 async function manualBookWithRealDurationGuard(request, env, ctx) {
@@ -87,8 +100,7 @@ async function calendarWithRealDuration(request, env, ctx) {
   const dt = (date, time) => `${date.replace(/-/g, "")}T${time.replace(":", "")}00`;
   const stamp = dt(new Date().toISOString().slice(0, 10), new Date().toISOString().slice(11, 16));
   const escapeIcs = value => String(value).replace(/\\/g, "\\\\").replace(/\r?\n/g, "\\n").replace(/([,;])/g, "\\$1");
-  const location = "15 Oakwood Road, Portsmouth, PO2 9QR";
-  const ics = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Autumn Nails//Booking//EN", "CALSCALE:GREGORIAN", "BEGIN:VEVENT", `UID:booking-${row.id}@autumnnails.com`, `DTSTAMP:${stamp}Z`, `DTSTART;TZID=Europe/London:${dt(row.date, row.start_time)}`, `DTEND;TZID=Europe/London:${dt(row.date, endTime)}`, `SUMMARY:${escapeIcs(summary)}`, `LOCATION:${escapeIcs(location)}`, `DESCRIPTION:${escapeIcs(summary)}`, "END:VEVENT", "END:VCALENDAR", ""].join("\r\n");
+  const ics = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Autumn Nails//Booking//EN", "CALSCALE:GREGORIAN", "BEGIN:VEVENT", `UID:booking-${row.id}@autumnnails.com`, `DTSTAMP:${stamp}Z`, `DTSTART;TZID=Europe/London:${dt(row.date, row.start_time)}`, `DTEND;TZID=Europe/London:${dt(row.date, endTime)}`, `SUMMARY:${escapeIcs(summary)}`, `LOCATION:${escapeIcs(BOOKING_LOCATION)}`, `DESCRIPTION:${escapeIcs(summary)}`, "END:VEVENT", "END:VCALENDAR", ""].join("\r\n");
   return new Response(ics, { status: 200, headers: { "Content-Type": "text/calendar; charset=utf-8", "Content-Disposition": "attachment; filename=autumn-nails-appointment.ics", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
 }
 
@@ -166,6 +178,55 @@ async function replaceBookingDuration(response, duration) {
     return jsonResponse(data, response);
   } catch { return response; }
 }
+
+async function sendBookingEmails(env, body, booking, duration) {
+  const firstName = cleanText(body.firstName, 80);
+  const surname = cleanText(body.surname, 80);
+  const email = normaliseEmail(body.email);
+  if (!email) return;
+  const customerName = `${firstName} ${surname}`.trim();
+  const date = formatDate(booking.date);
+  const time = `${formatTime(booking.startTime)} – ${formatTime(addMinutesToTime(booking.startTime, duration))}`;
+  const service = String(booking.service || "").trim();
+  const price = formatMoney(booking.price);
+  const addonLines = formatAddons(body.addons);
+  const infillNote = booking.infillChanged ? "The requested infill was outside the 3-week window, so the booking has been changed to the applicable full-set service." : "";
+  const calendarUrl = booking.calendarUrl || `${new URL("/calendar/event/" + encodeURIComponent(booking.id) + ".ics", "https://autumn-nails-booking.workers.dev").toString()}`;
+  const details = [
+    `Date: ${date}`,
+    `Time: ${time}`,
+    `Treatment: ${service}`,
+    `Price: ${price}`,
+    addonLines.length ? `Add-ons: ${addonLines.join(", ")}` : "Add-ons: None",
+    `Location: ${BOOKING_LOCATION}`,
+    infillNote
+  ].filter(Boolean);
+  const businessText = ["A new Autumn Nails appointment has been booked.", "", `Client: ${customerName}`, `Email: ${email}`, `Phone: ${cleanText(body.phone, 40)}`, ...details, "", `Add this appointment to your calendar: ${calendarUrl}`].join("\n");
+  const clientText = [`Hi ${firstName || "there"},", "", "Thank you for booking with Autumn Nails. Your appointment is confirmed.", "", ...details, "", `Add this appointment to your calendar: ${calendarUrl}`, "", "We look forward to seeing you!", "", "Autumn Nails"].join("\n");
+  const base = { from: { email: EMAIL_FROM, name: "Autumn Nails" }, replyTo: EMAIL_FROM };
+  const sends = [
+    env.EMAIL.send({ ...base, to: BUSINESS_EMAIL, subject: `New booking – ${customerName} – ${date}`, text: businessText }),
+    env.EMAIL.send({ ...base, to: email, subject: "Your Autumn Nails appointment is confirmed", text: clientText })
+  ];
+  const results = await Promise.allSettled(sends);
+  results.forEach((result, index) => {
+    if (result.status === "rejected") console.error(index === 0 ? "Business booking email failed:" : "Client booking email failed:", result.reason);
+  });
+}
+
+function cleanText(value, max) { return String(value || "").trim().replace(/\s+/g, " ").slice(0, max); }
+function normaliseEmail(value) { return String(value || "").trim().toLowerCase().slice(0, 254); }
+function formatAddons(value) {
+  const names = { "nail-art": "Nail Art (per nail)", "nail-stamping": "Nail Stamping (per nail)", "nail-stamping-full-set": "Nail Stamping (full set, per colour)" };
+  if (!value || typeof value !== "object") return [];
+  return Object.entries(names).flatMap(([id, name]) => {
+    const quantity = Math.floor(Math.max(0, Number(value[id] || 0)));
+    return Number.isFinite(quantity) && quantity > 0 ? [`${name} × ${quantity}`] : [];
+  });
+}
+function formatMoney(pence) { return `£${(Number(pence || 0) / 100).toFixed(2)}`; }
+function formatDate(value) { return new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "Europe/London" }).format(new Date(`${value}T12:00:00`)); }
+function formatTime(value) { const [hour, minute] = String(value).split(":").map(Number); return `${String(hour % 12 || 12)}:${String(minute).padStart(2, "0")}${hour >= 12 ? "pm" : "am"}`; }
 
 function jsonResponse(data, response) {
   const headers = new Headers(response.headers);
