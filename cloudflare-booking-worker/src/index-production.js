@@ -7,6 +7,8 @@ export default {
     const url = new URL(request.url);
     const originHeader = request.headers.get("Origin");
     const origin = SITE_ORIGINS.has(originHeader) ? originHeader : "https://autumnnails.com";
+    let existingMarketingConsent = null;
+    let existingClientId = null;
 
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders(origin) });
 
@@ -14,6 +16,14 @@ export default {
       try {
         const body = await request.clone().json();
         const slotId = Number(body.slotId);
+        const email = normaliseEmail(body.email);
+        if (email) {
+          const client = await env.DB.prepare("SELECT id, marketing_opt_in FROM clients WHERE email=? LIMIT 1").bind(email).first();
+          if (client) {
+            existingClientId = client.id;
+            existingMarketingConsent = Number(client.marketing_opt_in) === 1;
+          }
+        }
         if (Number.isInteger(slotId) && slotId > 0) {
           const slot = await env.DB.prepare("SELECT date,start_time,status,removed_at FROM availability_slots WHERE id=? LIMIT 1").bind(slotId).first();
           if (slot && slot.status === "available" && !slot.removed_at && isPastLondonSlot(slot.date, slot.start_time)) {
@@ -26,6 +36,18 @@ export default {
     }
 
     const response = await bookingWorker.fetch(request, env, ctx);
+
+    // A normal booking with marketingOptIn=false is not an explicit withdrawal of
+    // previously granted consent. Preserve an existing opt-in until an explicit
+    // unsubscribe/withdrawal mechanism is provided.
+    if (request.method === "POST" && url.pathname === "/api/book" && response.status === 201 && existingMarketingConsent && existingClientId) {
+      try {
+        await env.DB.prepare("UPDATE clients SET marketing_opt_in = 1 WHERE id = ?").bind(existingClientId).run();
+      } catch {
+        // Do not turn a successful booking into a failed booking if the consent
+        // preservation write cannot be completed.
+      }
+    }
 
     if (request.method === "GET" && url.pathname === "/api/availability" && response.ok) {
       try {
@@ -52,6 +74,10 @@ export function isPastLondonSlot(date, startTime, now = new Date()) {
   if (date > today) return false;
   const [hour, minute] = startTime.split(":").map(Number);
   return hour * 60 + minute <= Number(current.hour) * 60 + Number(current.minute);
+}
+
+function normaliseEmail(value) {
+  return String(value || "").trim().toLowerCase();
 }
 
 function corsHeaders(origin) {
