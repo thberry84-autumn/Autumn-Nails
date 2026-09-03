@@ -8,7 +8,7 @@
   const esc2 = v => String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;').replace(/'/g,'&#39;');
   const serviceOptions = () => ACTION_SERVICES.map(s => `<option value="${s[0]}">${esc2(s[1])} — ${money2(s[2])}</option>`).join('');
   const clientOptions = () => studioClients.map(c => `<option value="${esc2(c.id)}">${esc2(c.first_name+' '+c.surname)} — ${esc2(c.email)}</option>`).join('');
-  const addonFields = prefix => ACTION_ADDONS.map(a => `<div class="field"><label>${esc2(a[1])}</label><input id="${prefix}-${a[0]}" type="number" min="0" max="50" step="1" value="0"></div>`).join('');
+  const addonFields = prefix => ACTION_ADDONS.map(a => `<div class="field"><label>${esc2(a[1])}</label><input id="${prefix}-${a[0]}" type="number" min="0" max="10" step="1" value="0"></div>`).join('');
   async function refreshClients(){try{const d=await api(BOOKING_API,'/api/clients');studioClients=d.clients||[];['manual-client','treat-client'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML='<option value="">Choose client…</option>'+clientOptions()})}catch(e){console.warn('Studio client selector could not load',e)}}
 
   function addBookingUI(){
