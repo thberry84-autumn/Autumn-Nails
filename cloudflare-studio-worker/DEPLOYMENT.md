@@ -4,38 +4,47 @@ Do not perform these steps during the build phase. They are the controlled deplo
 
 ## 1. Cloudflare Access
 
-Create a Self-hosted application for the exact public hostname:
+Create one Self-hosted Access application covering these exact hostnames:
 
-`studio.autumnnails.com`
+- `studio.autumnnails.com`
+- `studio-booking-api.autumnnails.com`
+- `studio-media-api.autumnnails.com`
 
 Use an Allow policy containing only the owner's approved email address.
 
-Enable One-Time PIN as the login method. Do not use `Login Methods: One-time PIN` as an Include rule by itself; the email restriction must remain in the Allow policy.
+Enable One-Time PIN as the identity provider. Keep the email restriction in the Allow policy.
 
-Enable Independent MFA at the organization level, then set the Studio application/policy to require the Authenticator application (TOTP). Prefer `Require every login` for this private admin application.
+Enable Independent MFA at the organisation level, then require Authenticator application (TOTP) for the Studio application/policy. Prefer `Require every login` for this private admin application.
 
-## 2. DNS / Worker
+A multi-domain Access application is intentional here so the browser can authenticate once and use the same Access session for the UI and API hosts.
 
-Attach `studio.autumnnails.com` to the `autumn-nails-studio` Worker as a Custom Domain. Do not expose a `workers.dev` URL for production use.
+## 2. Workers / DNS
 
-The current Wrangler configuration deliberately has `workers_dev: false` so the build cannot accidentally create a public `workers.dev` endpoint.
+Attach `studio.autumnnails.com` to the `autumn-nails-studio` Worker as a Custom Domain.
 
-## 3. API migration
+Attach both API hostnames above to the `autumn-nails-studio-api` Worker as Custom Domains.
 
-Before production cutover, migrate the browser API calls from the existing password-session model to a Studio-only authenticated boundary. The Studio Worker must never accept an unauthenticated admin request and must not expose the existing admin API credentials to browser JavaScript.
+The current Wrangler configurations deliberately have `workers_dev: false`, so these Workers do not need public `workers.dev` production endpoints.
 
-The existing public booking endpoints must remain public where required by the customer booking flow; only administrative operations should require the Studio authentication boundary.
+## 3. API security
+
+The Studio API requires `ctx.access` for every request. This means the API itself rejects requests that reach it without an Access-authenticated Worker context; browser JavaScript never receives an admin password or legacy bearer token.
+
+The API uses the existing booking D1 database and nail-image R2 bucket. It does not run migrations. Set the existing GitHub token as the `GITHUB_TOKEN` Worker secret before enabling gallery write operations.
+
+The API Worker is intentionally separate from the public booking Worker, so the customer booking flow can remain unchanged during migration.
 
 ## 4. Cutover
 
-1. Deploy Studio without changing the public site.
-2. Confirm Access login works: email -> six-digit OTP -> TOTP.
-3. Confirm every admin module works with real data.
-4. Confirm unauthenticated requests are denied.
-5. Confirm `studio.autumnnails.com` is not linked from the public site or sitemap.
-6. Confirm the public `/admin/` area is no longer the active administration entry point.
-7. Remove the old password login only after Studio has passed the full test checklist.
+1. Deploy the Studio UI and Studio API from the isolated branch.
+2. Configure the three hostnames in the single Access application.
+3. Confirm the login works: email -> six-digit OTP -> TOTP.
+4. Confirm every admin module works with real data.
+5. Confirm unauthenticated API requests are denied.
+6. Confirm `studio.autumnnails.com` is not linked from the public site or sitemap.
+7. Confirm public booking and public gallery still work.
+8. Only then retire the old `/admin/` password login.
 
 ## 5. Rollback
 
-Keep the existing `/admin/` implementation intact until the Studio cutover has been tested and accepted. If anything fails, revert the Studio deployment and continue using the existing admin area while the issue is corrected.
+Keep the existing `/admin/` implementation intact until Studio has passed the full test checklist. If anything fails, leave production on the existing admin area while the Studio branch is corrected.
