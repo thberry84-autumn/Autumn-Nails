@@ -151,3 +151,25 @@ body{font-size:1rem}
   .actions{margin-top:24px}
   .home-gallery-slide img{height:280px}
 }
+@media (max-width:520px){
+  .wrap{width:calc(100% - 52px)}
+  body{font-size:.98rem}
+  .lede{font-size:.98rem;line-height:1.7}
+  .hero h1{font-size:2.72rem;line-height:.94}
+  .page-hero h1,.services-intro h1,.booking-hero h1{font-size:2.78rem !important;line-height:.96 !important}
+  .section h2{font-size:2.45rem}
+  .card h3{font-size:1.48rem}
+  .card p,.section-head p,.service-cta p,.about-copy p,.legal p,.legal li{font-size:.98rem}
+  .topbar{padding-left:12px;padding-right:8px}
+}
+@media (max-width:520px){
+  .wrap{width:calc(100% - 52px)}
+  body{font-size:.96rem}
+  .lede{font-size:.96rem;line-height:1.68}
+  .hero h1{font-size:2.58rem;line-height:.95}
+  .page-hero h1,.services-intro h1,.booking-hero h1{font-size:2.64rem !important;line-height:.98 !important}
+  .section h2{font-size:2.3rem}
+  .card h3{font-size:1.42rem}
+  .card p,.section-head p,.service-cta p,.about-copy p,.legal p,.legal li{font-size:.96rem}
+  .topbar{height:90px}
+}
