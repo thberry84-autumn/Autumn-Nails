@@ -42,6 +42,19 @@ jobs:
           ]
           image_files.sort(key=lambda p: p.name, reverse=True)
 
+          # Keep the homepage hero tied to the gallery's explicit homepage selection.
+          homepage = captions.get('_homepage', '')
+          valid_names = {p.name for p in image_files}
+          if homepage not in valid_names:
+              homepage = image_files[0].name if image_files else ''
+          if homepage:
+              hero_caption = html.escape(str(captions.get(homepage, '')).strip() or 'Recent Autumn Nails nail set', quote=True)
+              hero_src = html.escape(f'/images/nails/{homepage}', quote=True)
+              hero_pattern = r'(<div class="hero-photo"><img id="homeHeroPhoto" src=")[^"]*(" alt=")[^"]*(" fetchpriority="high">)'
+              text, hero_count = re.subn(hero_pattern, rf'\g<1>{hero_src}\g<2>{hero_caption}\g<3>', text, count=1)
+              if hero_count != 1:
+                  raise SystemExit('Could not find homepage hero image in index.html')
+
           slides = []
           for image in image_files:
               filename = image.name
@@ -70,6 +83,6 @@ jobs:
           if git diff --cached --quiet; then
             echo 'Homepage already up to date.'
           else
-            git commit -m 'Sync recent nail gallery to homepage'
+            git commit -m 'Sync selected homepage photo and recent gallery'
             git push
           fi
