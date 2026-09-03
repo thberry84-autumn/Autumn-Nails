@@ -95,12 +95,13 @@ async function manualBookWithRealDurationGuard(request, env, ctx) {
 async function calendarWithRealDuration(request, env, ctx) {
   const id = decodeURIComponent(new URL(request.url).pathname.slice("/calendar/event/".length).replace(/\.ics$/, ""));
   if (!/^[0-9a-f-]{36}$/i.test(id)) return bookingWorker.fetch(request, env, ctx);
-  const row = await env.DB.prepare("SELECT id,date,start_time,status,booked_service_id,selected_services_json FROM bookings WHERE id=? LIMIT 1").bind(id).first();
+  const row = await env.DB.prepare("SELECT b.id,b.date,b.start_time,b.status,b.booked_service_id,b.selected_services_json,c.first_name,c.surname FROM bookings b JOIN clients c ON c.id=b.client_id WHERE b.id=? LIMIT 1").bind(id).first();
   if (!row || row.status === "cancelled") return bookingWorker.fetch(request, env, ctx);
   const duration = durationForServices(selectedServiceIds(row));
   const endTime = addMinutesToTime(row.start_time, duration);
   const names = selectedServiceIds(row).map(serviceName);
-  const summary = `Autumn Nails – ${names.join(" + ")}`;
+  const customerName = `${String(row.first_name || "").trim()} ${String(row.surname || "").trim()}`.trim();
+  const summary = customerName ? `Autumn Nails – ${customerName} – ${names.join(" + ")}` : `Autumn Nails – ${names.join(" + ")}`;
   const dt = (date, time) => `${date.replace(/-/g, "")}T${time.replace(":", "")}00`;
   const stamp = dt(new Date().toISOString().slice(0, 10), new Date().toISOString().slice(11, 16));
   const escapeIcs = value => String(value).replace(/\\/g, "\\\\").replace(/\r?\n/g, "\\n").replace(/([,;])/g, "\\$1");
