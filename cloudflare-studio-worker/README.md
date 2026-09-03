@@ -30,7 +30,11 @@ This project is intentionally isolated from the production website. Do not deplo
 
 ## Audit status
 
-The code has been reviewed at PR level for authentication boundaries, existing D1 schema compatibility, booking-slot uniqueness, service pricing consistency, input validation, gallery file restrictions, client/marketing/finance data access, and production isolation. Manual/completed treatment entry also uses the existing booking schema and event history model. The remaining validation is runtime testing after a controlled Cloudflare deployment; this branch intentionally does not deploy automatically.
+PR-level review completed for the isolated architecture, Access authentication boundary, existing D1 schema compatibility, booking-slot uniqueness, service/pricing consistency, client and marketing data handling, finance calculations, gallery file validation, GitHub caption writes, security headers, and production isolation.
+
+Manual booking and completed-treatment entry were hardened to use the existing service prices, the existing appointment-slot uniqueness constraint, optional completed-treatment time as `00:00`, and the established maximum add-on quantity of 10. Client email uniqueness conflicts and booking price-adjustment bounds are handled explicitly.
+
+Runtime validation remains intentionally outstanding until the controlled Cloudflare deployment stage. There is no automatic deployment workflow in this branch.
 
 ## SEO / discovery
 
