@@ -24,7 +24,7 @@ const SERVICE_BY_ID = new Map(SERVICES.map(s => [s.id, s]));
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
-    const origin = request.headers.get("Origin") === STUDIO_ORIGIN ? STUDIO_ORIGIN : STUDIO_ORIGIN;
+    const origin = STUDIO_ORIGIN;
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors(origin) });
 
     try {
@@ -32,27 +32,21 @@ export default {
       if (url.pathname === "/health" && request.method === "GET") return json({ ok: true, service: "autumn-nails-studio-api" }, 200, origin);
       if (url.pathname === "/api/me" && request.method === "GET") return json({ email: identity.email || null, name: identity.name || null }, 200, origin);
       if (url.pathname === "/api/services" && request.method === "GET") return json({ services: SERVICES, addons: ADDONS }, 200, origin, { "Cache-Control": "no-store" });
-
       if (url.pathname === "/api/availability" && request.method === "GET") return await availability(env, origin);
       if (url.pathname === "/api/availability" && request.method === "POST") return await addAvailability(request, env, origin);
       if (url.pathname.startsWith("/api/availability/") && request.method === "DELETE") return await deleteAvailability(url, env, origin);
-
       if (url.pathname === "/api/bookings" && request.method === "GET") return await bookings(env, origin);
       if (url.pathname.startsWith("/api/bookings/") && request.method === "PATCH") return await updateBooking(url, request, env, origin);
-
       if (url.pathname === "/api/clients" && request.method === "GET") return await clients(env, origin);
       if (url.pathname === "/api/clients" && request.method === "POST") return await createClient(request, env, origin);
       if (url.pathname.startsWith("/api/clients/") && request.method === "PATCH") return await updateClient(url, request, env, origin);
       if (url.pathname.startsWith("/api/clients/") && url.pathname.endsWith("/history") && request.method === "GET") return await clientHistory(url, env, origin);
-
       if (url.pathname === "/api/marketing" && request.method === "GET") return await marketing(env, origin);
       if (url.pathname === "/api/finance" && request.method === "GET") return await finance(env, origin);
-
       if (url.pathname === "/api/gallery" && request.method === "GET") return json({ files: await listGallery(env) }, 200, origin, { "Cache-Control": "no-store" });
       if (url.pathname === "/api/gallery" && request.method === "POST") return await uploadGallery(request, env, origin);
       if (url.pathname === "/api/gallery/metadata" && request.method === "PUT") return await updateGalleryMetadata(request, env, origin);
       if (url.pathname.startsWith("/api/gallery/") && request.method === "DELETE") return await deleteGallery(url, env, origin);
-
       return json({ error: "Not found" }, 404, origin);
     } catch (error) {
       if (error?.status) return json({ error: error.message }, error.status, origin);
@@ -117,7 +111,7 @@ async function updateBooking(url, request, env, origin) {
   if (!allowedStatus.has(status)) return json({ error: "Invalid booking status." }, 400, origin);
   if (!allowedPayment.has(payment)) return json({ error: "Invalid payment status." }, 400, origin);
   const adjustment = body.priceAdjustmentPence == null ? Number(current.price_adjustment_pence || 0) : Math.round(Number(body.priceAdjustmentPence));
-  if (!Number.isFinite(adjustment)) return json({ error: "Invalid price adjustment." }, 400, origin);
+  if (!Number.isFinite(adjustment) || adjustment < -100000 || adjustment > 100000) return json({ error: "Invalid price adjustment." }, 400, origin);
   const finalPrice = Math.max(0, Number(current.price_pence || 0) + adjustment);
   const now = new Date().toISOString();
   await env.DB.batch([
@@ -156,7 +150,12 @@ async function updateClient(url, request, env, origin) {
   const firstName = cleanText(body.firstName ?? current.first_name,80), surname = cleanText(body.surname ?? current.surname,80), email = normaliseEmail(body.email ?? current.email), phone = cleanText(body.phone ?? current.phone,40);
   const marketing = body.marketingOptIn == null ? Number(current.marketing_opt_in || 0) : body.marketingOptIn === true ? 1 : 0;
   if (!firstName || !surname || !email || !phone) return json({ error: "Please complete all required client details." }, 400, origin);
-  await env.DB.prepare("UPDATE clients SET first_name=?,surname=?,email=?,phone=?,marketing_opt_in=?,updated_at=? WHERE id=?").bind(firstName,surname,email,phone,marketing,new Date().toISOString(),id).run();
+  try {
+    await env.DB.prepare("UPDATE clients SET first_name=?,surname=?,email=?,phone=?,marketing_opt_in=?,updated_at=? WHERE id=?").bind(firstName,surname,email,phone,marketing,new Date().toISOString(),id).run();
+  } catch (error) {
+    if (String(error?.message || error).toLowerCase().includes("unique")) return json({ error: "A client with that email address already exists." }, 409, origin);
+    throw error;
+  }
   return json({ ok: true }, 200, origin);
 }
 
