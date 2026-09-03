@@ -1,13 +1,14 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { env } from "cloudflare:workers";
-import worker from "../src/index-v2.js";
+import worker from "../src/index-production.js";
 
 const site = "https://autumnnails.com";
 
 function request(path, options = {}) {
   const headers = new Headers(options.headers || {});
   if (options.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
-  return worker.fetch(new Request(`${site}${path}`, { ...options, headers }), env);
+  headers.set("Origin", site);
+  return worker.fetch(new Request(`${site}${path}`, { ...options, headers }), env, { waitUntil() {} });
 }
 
 beforeEach(async () => {
@@ -16,16 +17,19 @@ beforeEach(async () => {
     env.DB.prepare("DELETE FROM bookings"),
     env.DB.prepare("DELETE FROM availability_slots"),
     env.DB.prepare("DELETE FROM clients"),
-    env.DB.prepare("DELETE FROM settings"),
+    env.DB.prepare("DELETE FROM settings")
   ]);
 });
 
 describe("direct booking expiry protection", () => {
   it("rejects a slot whose start time has already passed today", async () => {
     const now = new Date();
-    const parts = Object.fromEntries(new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/London", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(now).map(({ type, value }) => [type, value]));
+    const parts = Object.fromEntries(new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/London", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(now).filter(part => part.type !== "literal").map(({ type, value }) => [type, value]));
     const date = `${parts.year}-${parts.month}-${parts.day}`;
-    const slotId = (await env.DB.prepare("INSERT INTO availability_slots (date,start_time,service_ids_json,status,created_at,updated_at) VALUES (?,?,?,?,?,?)").bind(date, "00:01", JSON.stringify(["builder-full-set"]), "available", now.toISOString(), now.toISOString()).run()).meta.last_row_id;
+    const nowMinutes = Number(parts.hour) * 60 + Number(parts.minute);
+    const pastMinutes = Math.max(0, nowMinutes - 60);
+    const pastTime = `${String(Math.floor(pastMinutes / 60)).padStart(2, "0")}:${String(pastMinutes % 60).padStart(2, "0")}`;
+    const slotId = (await env.DB.prepare("INSERT INTO availability_slots (date,start_time,service_ids_json,status,created_at,updated_at) VALUES (?,?,?,?,?,?)").bind(date, pastTime, JSON.stringify(["builder-full-set"]), "available", now.toISOString(), now.toISOString()).run()).meta.last_row_id;
 
     const response = await request("/api/book", {
       method: "POST",
