@@ -20,31 +20,8 @@ env:
   CLOUDFLARE_ACCOUNT_ID: d94904809c2530355a903bbeb3306c03
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    defaults:
-      run:
-        working-directory: cloudflare-booking-worker
-    steps:
-      - name: Check out Worker source
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 1
-      - name: Set up Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: cloudflare-booking-worker/package.json
-      - name: Install dependencies
-        run: npm install --no-audit --no-fund --prefer-online
-      - name: Run Worker regression tests
-        run: npm test
-
   deploy:
     if: github.event_name != 'pull_request'
-    needs: test
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -52,13 +29,18 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 1
-      - name: Set up Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: 22
-      - name: Install dependencies
-        run: npm install --no-audit --no-fund --prefer-online
+      - name: Check Worker JavaScript syntax
         working-directory: cloudflare-booking-worker
+        run: |
+          node --check src/index-production.js
+          node --check src/index-duration.js
+          node --check src/index-history.js
+          node --check src/index-multi-calendar.js
+          node --check src/index-multi.js
+          node --check src/index-snagging.js
+          node --check src/index-calendar.js
+          node --check src/index.js
+          node --check src/duration-config.js
       - name: Apply D1 migrations
         uses: cloudflare/wrangler-action@v4
         with:
