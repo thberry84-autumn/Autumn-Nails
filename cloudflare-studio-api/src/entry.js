@@ -6,7 +6,7 @@ const STUDIO_ORIGIN = "https://studio.autumnnails.com";
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
-    const origin = request.headers.get("Origin") === STUDIO_ORIGIN ? STUDIO_ORIGIN : STUDIO_ORIGIN;
+    const origin = STUDIO_ORIGIN;
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors(origin) });
     if (url.pathname === "/api/manual-booking" || url.pathname === "/api/completed-treatment" || url.pathname.startsWith("/api/completed-treatment/")) {
       try {
