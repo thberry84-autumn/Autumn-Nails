@@ -69,10 +69,7 @@
         </div>
         <p>A little look at recent Autumn Nails work. Visit the gallery for more.</p>
       </div>
-      <div class="gallery">
-        <img src="/images/nails/2026-08-31T15-30-29-562Z-927c7c1b-IMG-5647.jpeg" alt="Autumn Nails manicure in warm orange tones with floral nail art" loading="lazy">
-        <img src="/images/nails/IMG_5892.jpeg" alt="Recent Autumn Nails manicure" loading="lazy">
-      </div>
+      <div id="homeGallery" class="gallery"><div class="muted">Loading gallery…</div></div>
       <div class="actions" style="justify-content:center"><a class="btn ghost" href="/gallery.html">View gallery</a></div>
     </div>
   </section>
@@ -119,5 +116,6 @@
     </div>
   </div>
 </footer>
+<script>const HOME_GALLERY_API='https://autumn-nails-upload.thberry84.workers.dev';const escHome=v=>String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;').replace(/'/g,'&#39;');async function loadHomeGallery(){const el=document.getElementById('homeGallery');try{const r=await fetch(HOME_GALLERY_API+'/api/gallery',{cache:'no-store'});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error();const files=(d.files||[]).slice(0,2);el.innerHTML=files.length?files.map(f=>`<img src="${escHome(f.url)}" alt="${escHome(f.caption||'Autumn Nails nail set')}" loading="lazy">`).join(''):'<div class="muted">No gallery photos yet.</div>';}catch{el.innerHTML='<div class="muted">The gallery is being refreshed. Please try again shortly.</div>';}}loadHomeGallery();</script>
 </body>
 </html>
