@@ -43,7 +43,7 @@ export default {
   }
 };
 
-function isPastLondonSlot(date, startTime) {
+export function isPastLondonSlot(date, startTime, now = new Date()) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date || "")) || !/^\d{2}:\d{2}$/.test(String(startTime || ""))) return false;
   const nowParts = new Intl.DateTimeFormat("en-GB", {
     timeZone: "Europe/London",
@@ -53,13 +53,13 @@ function isPastLondonSlot(date, startTime) {
     hour: "2-digit",
     minute: "2-digit",
     hourCycle: "h23"
-  }).formatToParts(new Date());
-  const now = Object.fromEntries(nowParts.filter(part => part.type !== "literal").map(part => [part.type, part.value]));
-  const today = `${now.year}-${now.month}-${now.day}`;
+  }).formatToParts(now);
+  const current = Object.fromEntries(nowParts.filter(part => part.type !== "literal").map(part => [part.type, part.value]));
+  const today = `${current.year}-${current.month}-${current.day}`;
   if (date < today) return true;
   if (date > today) return false;
   const [hour, minute] = startTime.split(":").map(Number);
-  return hour * 60 + minute <= Number(now.hour) * 60 + Number(now.minute);
+  return hour * 60 + minute <= Number(current.hour) * 60 + Number(current.minute);
 }
 
 function corsHeaders(origin) {
