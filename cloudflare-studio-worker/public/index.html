@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<title>Studio | Autumn Nails</title>
+<style>
+:root{--ink:#64342d;--ink2:#80584d;--paper:#fbf3ed;--cream:#fffaf6;--terracotta:#bf7054;--sage:#a9aa93;--line:rgba(100,52,45,.14);--shadow:0 24px 70px rgba(95,55,45,.12)}
+*{box-sizing:border-box}html{font-size:18px}body{margin:0;min-height:100vh;font-family:ui-rounded,"Nunito Sans","Avenir Next","Segoe UI",sans-serif;color:var(--ink);background:radial-gradient(circle at 13% 8%,rgba(205,151,117,.16),transparent 27%),radial-gradient(circle at 88% 11%,rgba(167,169,146,.12),transparent 23%),linear-gradient(135deg,#f7ebe3,#fcf5f0 46%,#f1dfd4)}
+.wrap{width:min(1180px,calc(100% - 28px));margin:auto;padding:24px 0 70px}.topbar{background:rgba(255,250,246,.94);backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.9);box-shadow:0 16px 38px rgba(90,48,40,.1);border-radius:28px;padding:16px 22px;display:flex;align-items:center;justify-content:space-between;gap:20px}.brand{display:flex;align-items:center;width:220px;height:86px;overflow:hidden}.brand img{display:block;width:210px;height:80px;object-fit:contain;object-position:left center}.private{font-size:.72rem;text-transform:uppercase;letter-spacing:.18em;color:#a06b59;text-align:right}.hero{padding:68px 0 42px;max-width:850px}.kicker{font-size:.76rem;text-transform:uppercase;letter-spacing:.24em;color:#a06b59;margin-bottom:12px}.hero h1{font:400 clamp(3.6rem,7vw,6.6rem) Georgia,serif;line-height:.88;letter-spacing:-.05em;margin:0 0 24px}.hero h1 em{font-style:normal;color:var(--terracotta)}.hero p{color:var(--ink2);font-size:1.1rem;line-height:1.85;margin:0}.grid{display:grid;grid-template-columns:repeat(5,1fr);gap:16px}.card{display:flex;flex-direction:column;justify-content:space-between;min-height:205px;background:rgba(255,250,246,.9);border:1px solid rgba(255,255,255,.9);box-shadow:var(--shadow);border-radius:24px;padding:26px}.card h2{font:400 1.55rem Georgia,serif;margin:0 0 10px}.card p{color:var(--ink2);font-size:.96rem;line-height:1.7;margin:0 0 20px}.badge{display:inline-flex;align-self:flex-start;padding:7px 11px;border-radius:999px;background:#f3e6df;color:#80584d;font-size:.7rem;text-transform:uppercase;letter-spacing:.12em}.note{margin-top:28px;padding:18px 20px;border-radius:18px;background:rgba(255,250,246,.68);border:1px solid var(--line);color:#9a786d;font-size:.84rem;line-height:1.7}.footer{margin-top:34px;color:#9a786d;font-size:.76rem;line-height:1.6}
+@media(max-width:1050px){.grid{grid-template-columns:repeat(3,1fr)}}@media(max-width:700px){.topbar{align-items:flex-start}.private{font-size:.65rem}.grid{grid-template-columns:1fr 1fr}.hero{padding-top:48px}}@media(max-width:480px){.grid{grid-template-columns:1fr}.brand{width:190px;height:75px}.brand img{width:185px;height:70px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="topbar">
+  <a class="brand" href="/"><img src="https://autumnnails.com/images/autumn-nails-logo.svg?v=20260903" alt="Autumn Nails"></a>
+  <div class="private">Private Studio<br>Autumn Nails</div>
+</header>
+<section class="hero">
+  <div class="kicker">Private studio</div>
+  <h1>Autumn Nails, <em>behind the scenes.</em></h1>
+  <p>This is the private working area for Autumn Nails. It is separate from the customer website and is intended to sit behind Cloudflare Access before it is made live.</p>
+</section>
+<section class="grid" aria-label="Studio areas">
+  <article class="card"><div><h2>Bookings</h2><p>Manage released appointment spaces, customer bookings and your private calendar.</p></div><span class="badge">Module ready to migrate</span></article>
+  <article class="card"><div><h2>Clients</h2><p>View customer records, create manual bookings and keep treatment history.</p></div><span class="badge">Module ready to migrate</span></article>
+  <article class="card"><div><h2>Photos</h2><p>Upload nail sets, edit captions, control gallery order and choose the homepage image.</p></div><span class="badge">Module ready to migrate</span></article>
+  <article class="card"><div><h2>Marketing</h2><p>See customers who have explicitly opted in to Autumn Nails marketing.</p></div><span class="badge">Module ready to migrate</span></article>
+  <article class="card"><div><h2>Payments</h2><p>Record adjustments, final charges and payment status against bookings.</p></div><span class="badge">Module ready to migrate</span></article>
+</section>
+<div class="note"><strong>Security boundary:</strong> this Studio hostname will not be linked from the public Autumn Nails website or public sitemap. Cloudflare Access will provide the login layer before the Studio is deployed.</div>
+<div class="footer">Build status: isolated branch only · No production DNS, Cloudflare Access policy or deployment has been changed.</div>
+</div>
+</body>
+</html>
