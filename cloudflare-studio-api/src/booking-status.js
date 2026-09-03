@@ -36,16 +36,16 @@ export async function handleBookingStatusUpdate(request, env, ctx, origin, pathn
           .bind(status, payment, adjustment, finalPrice, now, id, current.slot_id),
         env.DB.prepare("UPDATE availability_slots SET status='available',updated_at=? WHERE id=? AND status='booked' AND EXISTS (SELECT 1 FROM bookings WHERE id=? AND status='cancelled')")
           .bind(now, current.slot_id, id),
-        env.DB.prepare("INSERT INTO booking_events (id,booking_id,event_type,metadata_json,created_at) SELECT ?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM bookings WHERE id=? AND status='cancelled')")
+        env.DB.prepare("INSERT INTO booking_events (id,booking_id,event_type,metadata_json,created_at) SELECT ?,?,?,?,? WHERE EXISTS (SELECT 1 FROM bookings WHERE id=? AND status='cancelled')")
           .bind(crypto.randomUUID(), id, "studio_booking_updated", metadata, now, id)
       ]);
     } else if (current.status === "cancelled" && status !== "cancelled") {
       await env.DB.batch([
         env.DB.prepare("UPDATE bookings SET status=?,payment_status=?,price_adjustment_pence=?,final_price_pence=?,updated_at=? WHERE id=? AND status='cancelled' AND EXISTS (SELECT 1 FROM availability_slots WHERE id=? AND status='available')")
           .bind(status, payment, adjustment, finalPrice, now, id, current.slot_id),
-        env.DB.prepare("UPDATE availability_slots SET status='booked',updated_at=? WHERE id=? AND status='available' AND EXISTS (SELECT 1 FROM bookings WHERE id=? AND status!= 'cancelled')")
+        env.DB.prepare("UPDATE availability_slots SET status='booked',updated_at=? WHERE id=? AND status='available' AND EXISTS (SELECT 1 FROM bookings WHERE id=? AND status!='cancelled')")
           .bind(now, current.slot_id, id),
-        env.DB.prepare("INSERT INTO booking_events (id,booking_id,event_type,metadata_json,created_at) SELECT ?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM bookings WHERE id=? AND status!= 'cancelled')")
+        env.DB.prepare("INSERT INTO booking_events (id,booking_id,event_type,metadata_json,created_at) SELECT ?,?,?,?,? WHERE EXISTS (SELECT 1 FROM bookings WHERE id=? AND status!='cancelled')")
           .bind(crypto.randomUUID(), id, "studio_booking_updated", metadata, now, id)
       ]);
     } else {
