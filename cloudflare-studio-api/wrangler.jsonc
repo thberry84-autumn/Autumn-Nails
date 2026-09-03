@@ -4,6 +4,10 @@
   "main": "src/index.js",
   "compatibility_date": "2026-09-03",
   "workers_dev": false,
+  "routes": [
+    { "pattern": "studio-booking-api.autumnnails.com", "custom_domain": true },
+    { "pattern": "studio-media-api.autumnnails.com", "custom_domain": true }
+  ],
   "dev": {
     "access": {
       "aud": "autumn-nails-studio-local",
