@@ -1,5 +1,3 @@
-const STUDIO_ORIGIN = "https://studio.autumnnails.com";
-
 export async function handleBookingStatusUpdate(request, env, ctx, origin, pathname) {
   if (request.method !== "PATCH" || !pathname.startsWith("/api/bookings/")) return null;
   if (!ctx?.access) return json({ error: "Studio authentication is required." }, 401, origin);
@@ -29,40 +27,35 @@ export async function handleBookingStatusUpdate(request, env, ctx, origin, pathn
 
   const finalPrice = Math.max(0, Number(current.price_pence || 0) + adjustment);
   const now = new Date().toISOString();
+  const metadata = JSON.stringify({ status, paymentStatus: payment, priceAdjustmentPence: adjustment, finalPricePence: finalPrice });
 
   try {
-    if (status === "cancelled") {
-      await env.DB.batch([
-        env.DB.prepare("UPDATE bookings SET status=?,payment_status=?,price_adjustment_pence=?,final_price_pence=?,updated_at=? WHERE id=?")
-          .bind(status, payment, adjustment, finalPrice, now, id),
-        env.DB.prepare("UPDATE availability_slots SET status='available',updated_at=? WHERE id=?")
-          .bind(now, current.slot_id),
-        env.DB.prepare("INSERT INTO booking_events (id,booking_id,event_type,metadata_json,created_at) VALUES (?,?,?,?,?)")
-          .bind(crypto.randomUUID(), id, "studio_booking_updated", JSON.stringify({ status, paymentStatus: payment, priceAdjustmentPence: adjustment, finalPricePence: finalPrice }), now)
-      ]);
-    } else if (current.status === "cancelled") {
-      try {
-        await env.DB.batch([
-          env.DB.prepare("UPDATE availability_slots SET status='booked',updated_at=? WHERE id=? AND status='available'").bind(now, current.slot_id),
-          env.DB.prepare("UPDATE bookings SET status=?,payment_status=?,price_adjustment_pence=?,final_price_pence=?,updated_at=? WHERE id=?").bind(status, payment, adjustment, finalPrice, now, id),
-          env.DB.prepare("INSERT INTO booking_events (id,booking_id,event_type,metadata_json,created_at) VALUES (?,?,?,?,?)").bind(crypto.randomUUID(), id, "studio_booking_updated", JSON.stringify({ status, paymentStatus: payment, priceAdjustmentPence: adjustment, finalPricePence: finalPrice }), now)
-        ]);
-      } catch (error) {
-        if (String(error?.message || error).toLowerCase().includes("unique")) return json({ error: "That appointment space is no longer available." }, 409, origin);
-        throw error;
+    if (status === "cancelled" && current.status !== "cancelled") {
+      const slotUpdate = await env.DB.prepare(
+        "UPDATE availability_slots SET status='available',updated_at=? WHERE id=? AND status='booked'"
+      ).bind(now, current.slot_id).run();
+      if (!slotUpdate.meta?.changes) {
+        return json({ error: "The appointment space is not currently booked, so the booking could not be cancelled safely." }, 409, origin);
       }
-      const slot = await env.DB.prepare("SELECT status FROM availability_slots WHERE id=? LIMIT 1").bind(current.slot_id).first();
-      if (slot?.status !== "booked") return json({ error: "That appointment space is no longer available." }, 409, origin);
-    } else {
-      await env.DB.batch([
-        env.DB.prepare("UPDATE bookings SET status=?,payment_status=?,price_adjustment_pence=?,final_price_pence=?,updated_at=? WHERE id=?")
-          .bind(status, payment, adjustment, finalPrice, now, id),
-        env.DB.prepare("INSERT INTO booking_events (id,booking_id,event_type,metadata_json,created_at) VALUES (?,?,?,?,?)")
-          .bind(crypto.randomUUID(), id, "studio_booking_updated", JSON.stringify({ status, paymentStatus: payment, priceAdjustmentPence: adjustment, finalPricePence: finalPrice }), now)
-      ]);
+    } else if (current.status === "cancelled" && status !== "cancelled") {
+      const slotUpdate = await env.DB.prepare(
+        "UPDATE availability_slots SET status='booked',updated_at=? WHERE id=? AND status='available'"
+      ).bind(now, current.slot_id).run();
+      if (!slotUpdate.meta?.changes) {
+        return json({ error: "That appointment space is no longer available." }, 409, origin);
+      }
     }
+
+    await env.DB.batch([
+      env.DB.prepare("UPDATE bookings SET status=?,payment_status=?,price_adjustment_pence=?,final_price_pence=?,updated_at=? WHERE id=?")
+        .bind(status, payment, adjustment, finalPrice, now, id),
+      env.DB.prepare("INSERT INTO booking_events (id,booking_id,event_type,metadata_json,created_at) VALUES (?,?,?,?,?)")
+        .bind(crypto.randomUUID(), id, "studio_booking_updated", metadata, now)
+    ]);
   } catch (error) {
-    if (String(error?.message || error).toLowerCase().includes("unique")) return json({ error: "That appointment space is no longer available." }, 409, origin);
+    if (String(error?.message || error).toLowerCase().includes("unique")) {
+      return json({ error: "That appointment space is no longer available." }, 409, origin);
+    }
     throw error;
   }
 
