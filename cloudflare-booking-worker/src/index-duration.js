@@ -3,7 +3,6 @@ import { DEFAULT_DURATION_MINUTES, durationForServices, addMinutesToTime, overla
 
 const BUSINESS_EMAIL = "autumnnails.uk@gmail.com";
 const EMAIL_FROM = "bookings@autumnnails.com";
-const BOOKING_LOCATION = "15 Oakwood Road, Portsmouth, PO2 9QR";
 
 export default {
   async fetch(request, env, ctx) {
@@ -58,6 +57,7 @@ async function bookWithRealDurationGuard(request, env, ctx) {
   if (slot?.date && await weekdayHasBooking(env, slot.date)) return corsJson({ error: "That weekday is already fully booked. Please choose another day." }, 409, request);
   const duration = await effectiveDurationForBooking(body, serviceIds, env, slot?.date);
   if (slot && slot.status === "available" && !slot.removed_at) {
+    if (isPastLondonSlot(slot.date, slot.start_time)) return corsJson({ error: "That appointment time has already passed. Please choose another time." }, 409, request);
     const conflict = await bookingOverlaps(env, slot.date, slot.start_time, duration);
     if (conflict) return corsJson({ error: "That appointment time is no longer available for the treatments selected. Please choose another time." }, 409, request);
   }
@@ -83,6 +83,7 @@ async function manualBookWithRealDurationGuard(request, env, ctx) {
   if (slot?.date && await weekdayHasBooking(env, slot.date)) return corsJson({ error: "That weekday is already fully booked. Please choose another day." }, 409, request);
   const duration = await effectiveDurationForBooking(body, serviceIds, env, slot?.date);
   if (slot && slot.status === "available" && !slot.removed_at) {
+    if (isPastLondonSlot(slot.date, slot.start_time)) return corsJson({ error: "That appointment time has already passed. Please choose another time." }, 409, request);
     const conflict = await bookingOverlaps(env, slot.date, slot.start_time, duration);
     if (conflict) return corsJson({ error: "That appointment time overlaps an existing booking. Please choose another time." }, 409, request);
   }
@@ -103,7 +104,8 @@ async function calendarWithRealDuration(request, env, ctx) {
   const dt = (date, time) => `${date.replace(/-/g, "")}T${time.replace(":", "")}00`;
   const stamp = dt(new Date().toISOString().slice(0, 10), new Date().toISOString().slice(11, 16));
   const escapeIcs = value => String(value).replace(/\\/g, "\\\\").replace(/\r?\n/g, "\\n").replace(/([,;])/g, "\\$1");
-  const ics = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Autumn Nails//Booking//EN", "CALSCALE:GREGORIAN", "BEGIN:VEVENT", `UID:booking-${row.id}@autumnnails.com`, `DTSTAMP:${stamp}Z`, `DTSTART;TZID=Europe/London:${dt(row.date, row.start_time)}`, `DTEND;TZID=Europe/London:${dt(row.date, endTime)}`, `SUMMARY:${escapeIcs(summary)}`, `LOCATION:${escapeIcs(BOOKING_LOCATION)}`, `DESCRIPTION:${escapeIcs(summary)}`, "END:VEVENT", "END:VCALENDAR", ""].join("\r\n");
+  const location = String(env.BOOKING_LOCATION || "Autumn Nails, Portsmouth").trim();
+  const ics = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Autumn Nails//Booking//EN", "CALSCALE:GREGORIAN", "BEGIN:VEVENT", `UID:booking-${row.id}@autumnnails.com`, `DTSTAMP:${stamp}Z`, `DTSTART;TZID=Europe/London:${dt(row.date, row.start_time)}`, `DTEND;TZID=Europe/London:${dt(row.date, endTime)}`, `SUMMARY:${escapeIcs(summary)}`, `LOCATION:${escapeIcs(location)}`, `DESCRIPTION:${escapeIcs(summary)}`, "END:VEVENT", "END:VCALENDAR", ""].join("\r\n");
   return new Response(ics, { status: 200, headers: { "Content-Type": "text/calendar; charset=utf-8", "Content-Disposition": "attachment; filename=autumn-nails-appointment.ics", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
 }
 
@@ -123,6 +125,17 @@ function isWeekday(date) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const day = new Date(`${value}T12:00:00Z`).getUTCDay();
   return day >= 1 && day <= 5;
+}
+
+function isPastLondonSlot(date, startTime, now = new Date()) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date || "")) || !/^\d{2}:\d{2}$/.test(String(startTime || ""))) return false;
+  const parts = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/London", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(now);
+  const current = Object.fromEntries(parts.filter(part => part.type !== "literal").map(part => [part.type, part.value]));
+  const today = `${current.year}-${current.month}-${current.day}`;
+  if (date < today) return true;
+  if (date > today) return false;
+  const [hour, minute] = startTime.split(":").map(Number);
+  return hour * 60 + minute <= Number(current.hour) * 60 + Number(current.minute);
 }
 
 async function effectiveDurationForBooking(body, serviceIds, env, targetDate) {
@@ -187,26 +200,14 @@ async function sendBookingEmails(env, body, booking, duration) {
   const addonLines = formatAddons(body.addons);
   const infillNote = booking.infillChanged ? "The requested infill was outside the 3-week window, so the booking has been changed to the applicable full-set service." : "";
   const calendarUrl = booking.calendarUrl || `${new URL("/calendar/event/" + encodeURIComponent(booking.id) + ".ics", "https://autumn-nails-booking.workers.dev").toString()}`;
-  const details = [
-    `Date: ${date}`,
-    `Time: ${time}`,
-    `Treatment: ${service}`,
-    `Price: ${price}`,
-    addonLines.length ? `Add-ons: ${addonLines.join(", ")}` : "Add-ons: None",
-    `Location: ${BOOKING_LOCATION}`,
-    infillNote
-  ].filter(Boolean);
+  const location = String(env.BOOKING_LOCATION || "Autumn Nails, Portsmouth").trim();
+  const details = [`Date: ${date}`, `Time: ${time}`, `Treatment: ${service}`, `Price: ${price}`, addonLines.length ? `Add-ons: ${addonLines.join(", ")}` : "Add-ons: None", `Location: ${location}`, infillNote].filter(Boolean);
   const businessText = ["A new Autumn Nails appointment has been booked.", "", `Client: ${customerName}`, `Email: ${email}`, `Phone: ${cleanText(body.phone, 40)}`, ...details, "", `Add this appointment to your calendar: ${calendarUrl}`].join("\n");
   const clientText = [`Hi ${firstName || "there"},`, "", "Thank you for booking with Autumn Nails. Your appointment is confirmed.", "", ...details, "", `Add this appointment to your calendar: ${calendarUrl}`, "", "We look forward to seeing you!", "", "Autumn Nails"].join("\n");
   const base = { from: { email: EMAIL_FROM, name: "Autumn Nails" }, replyTo: EMAIL_FROM };
-  const sends = [
-    env.EMAIL.send({ ...base, to: BUSINESS_EMAIL, subject: `New booking – ${customerName} – ${date}`, text: businessText }),
-    env.EMAIL.send({ ...base, to: email, subject: "Your Autumn Nails appointment is confirmed", text: clientText })
-  ];
+  const sends = [env.EMAIL.send({ ...base, to: BUSINESS_EMAIL, subject: `New booking – ${customerName} – ${date}`, text: businessText }), env.EMAIL.send({ ...base, to: email, subject: "Your Autumn Nails appointment is confirmed", text: clientText })];
   const results = await Promise.allSettled(sends);
-  results.forEach((result, index) => {
-    if (result.status === "rejected") console.error(index === 0 ? "Business booking email failed:" : "Client booking email failed:", result.reason);
-  });
+  results.forEach((result, index) => { if (result.status === "rejected") console.error(index === 0 ? "Business booking email failed:" : "Client booking email failed:", result.reason); });
 }
 
 function cleanText(value, max) { return String(value || "").trim().replace(/\s+/g, " ").slice(0, max); }
@@ -214,22 +215,11 @@ function normaliseEmail(value) { return String(value || "").trim().toLowerCase()
 function formatAddons(value) {
   const names = { "nail-art": "Nail Art (per nail)", "nail-stamping": "Nail Stamping (per nail)", "nail-stamping-full-set": "Nail Stamping (full set, per colour)" };
   if (!value || typeof value !== "object") return [];
-  return Object.entries(names).flatMap(([id, name]) => {
-    const quantity = Math.floor(Math.max(0, Number(value[id] || 0)));
-    return Number.isFinite(quantity) && quantity > 0 ? [`${name} × ${quantity}`] : [];
-  });
+  return Object.entries(names).flatMap(([id, name]) => { const quantity = Math.floor(Math.max(0, Number(value[id] || 0))); return Number.isFinite(quantity) && quantity > 0 ? [`${name} × ${quantity}`] : []; });
 }
 function formatMoney(pence) { return `£${(Number(pence || 0) / 100).toFixed(2)}`; }
 function formatDate(value) { return new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "Europe/London" }).format(new Date(`${value}T12:00:00`)); }
 function formatTime(value) { const [hour, minute] = String(value).split(":").map(Number); return `${String(hour % 12 || 12)}:${String(minute).padStart(2, "0")}${hour >= 12 ? "pm" : "am"}`; }
 
-function jsonResponse(data, response) {
-  const headers = new Headers(response.headers);
-  headers.delete("Content-Encoding"); headers.delete("Content-Length"); headers.set("Content-Type", "application/json; charset=utf-8");
-  return new Response(JSON.stringify(data), { status: response.status, statusText: response.statusText, headers });
-}
-
-function corsJson(data, status, request) {
-  const origin = request.headers.get("Origin") === "https://www.autumnnails.com" ? "https://www.autumnnails.com" : "https://autumnnails.com";
-  return new Response(JSON.stringify(data), { status, headers: { "Access-Control-Allow-Origin": origin, "Access-Control-Allow-Credentials": "true", "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", "Vary": "Origin" } });
-}
+function jsonResponse(data, response) { const headers = new Headers(response.headers); headers.delete("Content-Encoding"); headers.delete("Content-Length"); headers.set("Content-Type", "application/json; charset=utf-8"); return new Response(JSON.stringify(data), { status: response.status, statusText: response.statusText, headers }); }
+function corsJson(data, status, request) { const origin = request.headers.get("Origin") === "https://www.autumnnails.com" ? "https://www.autumnnails.com" : "https://autumnnails.com"; return new Response(JSON.stringify(data), { status, headers: { "Access-Control-Allow-Origin": origin, "Access-Control-Allow-Credentials": "true", "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", "Vary": "Origin" } }); }
