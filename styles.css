@@ -163,5 +163,9 @@ body{font-size:1rem}
   .topbar{padding-left:12px;padding-right:8px}
 }
 @media (max-width:520px){
-  .hero{padding-top:20px;}
+  .hero{padding-top:22px;padding-bottom:48px;gap:26px}
+  .hero h1{margin:16px 0 18px}
+  .actions{margin-top:20px}
+  .note{margin-top:14px}
+  .hero-photo{margin-top:4px}
 }
