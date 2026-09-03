@@ -32,6 +32,7 @@ jobs:
       - name: Check Worker JavaScript syntax
         working-directory: cloudflare-booking-worker
         run: |
+          node --check src/index-cancel.js
           node --check src/index-production.js
           node --check src/index-duration.js
           node --check src/index-history.js
