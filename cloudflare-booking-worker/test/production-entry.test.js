@@ -76,6 +76,36 @@ describe("production Worker entrypoint", () => {
     expect(body.booking.calendarUrl).toContain(`/calendar/event/${body.booking.id}`);
   });
 
+  it("preserves an existing returning customer's marketing opt-in", async () => {
+    const date = futureDate(12);
+    const now = new Date().toISOString();
+    const clientId = crypto.randomUUID();
+    await env.DB.prepare("INSERT INTO clients (id,first_name,surname,email,phone,marketing_opt_in,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)")
+      .bind(clientId, "Jane", "Smith", "jane@example.com", "07123456789", 1, now, now)
+      .run();
+    const slot = await env.DB.prepare("INSERT INTO availability_slots (date,start_time,service_ids_json,status,created_at,updated_at) VALUES (?,?,?,?,?,?)")
+      .bind(date, "18:00", JSON.stringify(["gel-polish"]), "available", now, now)
+      .run();
+
+    const response = await request("/api/book", {
+      method: "POST",
+      body: JSON.stringify({
+        slotId: slot.meta.last_row_id,
+        serviceId: "gel-polish",
+        firstName: "Jane",
+        surname: "Smith",
+        email: "jane@example.com",
+        phone: "07123456789",
+        marketingOptIn: false,
+        addons: {}
+      })
+    });
+
+    expect(response.status).toBe(201);
+    const client = await env.DB.prepare("SELECT marketing_opt_in FROM clients WHERE id = ?").bind(clientId).first();
+    expect(Number(client.marketing_opt_in)).toBe(1);
+  });
+
   it("rejects a direct booking for an earlier slot today", async () => {
     const nowParts = londonDateParts();
     const today = `${nowParts.year}-${nowParts.month}-${nowParts.day}`;
