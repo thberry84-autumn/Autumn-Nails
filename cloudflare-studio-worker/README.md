@@ -10,6 +10,7 @@ This project is intentionally isolated from the production website. Do not deplo
 
 - Public website: `https://autumnnails.com`
 - Private Studio: `https://studio.autumnnails.com`
+- Private API hosts: `studio-booking-api.autumnnails.com` and `studio-media-api.autumnnails.com`
 - Studio authentication: Cloudflare Access
   - approved email via One-Time PIN
   - independent TOTP authenticator MFA
@@ -26,6 +27,10 @@ This project is intentionally isolated from the production website. Do not deplo
 5. Configure `studio.autumnnails.com` and the Cloudflare Access application only when ready for a controlled deployment.
 6. Test the complete flow: email -> six-digit OTP -> authenticator TOTP -> Studio dashboard.
 7. Only after successful testing, retire the public `/admin/` login and remove its production references.
+
+## Audit status
+
+The code has been reviewed at PR level for authentication boundaries, existing D1 schema compatibility, booking-slot uniqueness, service pricing consistency, input validation, gallery file restrictions, client/marketing/finance data access, and production isolation. Manual/completed treatment entry also uses the existing booking schema and event history model. The remaining validation is runtime testing after a controlled Cloudflare deployment; this branch intentionally does not deploy automatically.
 
 ## SEO / discovery
 
