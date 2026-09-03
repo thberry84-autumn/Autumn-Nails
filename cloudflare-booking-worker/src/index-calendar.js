@@ -1,6 +1,5 @@
 import phase4Worker from "./index-phase4.js";
-
-const DURATION_MINUTES = 120;
+import { durationForServices } from "./duration-config.js";
 
 export default {
   async fetch(request, env, ctx) {
@@ -32,7 +31,8 @@ async function calendarChooser(bookingId, env) {
   const row = await env.DB.prepare("SELECT b.id,b.date,b.start_time,b.status,b.booked_service_id FROM bookings b WHERE b.id=? LIMIT 1").bind(id).first();
   if (!row || row.status === "cancelled") return new Response("Not found", { status: 404 });
   const service = serviceName(row.booked_service_id);
-  const endTime = addMinutesToTime(row.start_time, DURATION_MINUTES);
+  const duration = durationForServices([row.booked_service_id]);
+  const endTime = addMinutesToTime(row.start_time, duration);
   const location = String(env.BOOKING_LOCATION || "").trim();
   const dates = `${icsDate(row.date, row.start_time)}/${icsDate(row.date, endTime)}`;
   const googleParams = new URLSearchParams({ action: "TEMPLATE", text: `Autumn Nails – ${service}`, dates, ctz: "Europe/London", details: `${service} appointment at Autumn Nails.` });
