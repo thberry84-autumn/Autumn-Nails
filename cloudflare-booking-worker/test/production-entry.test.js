@@ -77,9 +77,13 @@ describe("production Worker entrypoint", () => {
 
     const calendarResponse = await request(`/calendar/event/${body.booking.id}`);
     expect(calendarResponse.status).toBe(200);
-    const calendarHtml = await calendarResponse.text();
-    expect(calendarHtml).toContain("6:00pm–7:30pm");
-    expect(calendarHtml).not.toContain("6:00pm–8:00pm");
+    expect(calendarResponse.headers.get("Content-Type")).toMatch(/text\/calendar/i);
+    const calendarIcs = await calendarResponse.text();
+    expect(calendarIcs).toContain("DTSTART;TZID=Europe/London:");
+    expect(calendarIcs).toContain("DTEND;TZID=Europe/London:");
+    expect(calendarIcs).toContain("DTSTART;TZID=Europe/London:" + date.replace(/-/g, "") + "T180000");
+    expect(calendarIcs).toContain("DTEND;TZID=Europe/London:" + date.replace(/-/g, "") + "T193000");
+    expect(calendarIcs).not.toContain("T200000");
   });
 
   it("preserves an existing returning customer's marketing opt-in", async () => {
