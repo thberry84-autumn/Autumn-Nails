@@ -67,7 +67,7 @@ async function completedTreatment(request, env, origin) {
   const body = await request.json();
   const clientId = String(body.clientId || "").trim();
   const date = normaliseDate(body.date);
-  const time = normaliseTime(body.time);
+  const time = normaliseTime(body.time) || "00:00";
   const services = normaliseServices(body.services, body.serviceId);
   const addons = normaliseAddons(body.addons);
   const notes = String(body.notes || "").trim().slice(0,2000);
@@ -113,7 +113,7 @@ async function updateCompletedTreatment(id, request, env, origin) {
   const metadata = parseJson(existing.history_metadata,{});
   if (metadata.source !== "completed-treatment") return json({ error:"Only completed treatments added in Studio can be edited here." },400,origin);
   const body = await request.json();
-  const date = normaliseDate(body.date), time = normaliseTime(body.time), services = normaliseServices(body.services,body.serviceId), addons = normaliseAddons(body.addons);
+  const date = normaliseDate(body.date), time = normaliseTime(body.time) || "00:00", services = normaliseServices(body.services,body.serviceId), addons = normaliseAddons(body.addons);
   const notes = String(body.notes || "").trim().slice(0,2000), adjustment = Number(body.priceAdjustmentPence || 0), paymentStatus = String(body.paymentStatus || "paid");
   if (!date || !services.length) return json({ error:"Please choose a date and at least one treatment." },400,origin);
   if (date > new Date().toISOString().slice(0,10)) return json({ error:"A completed treatment cannot be dated in the future." },400,origin);
@@ -139,7 +139,7 @@ async function requireAccess(ctx){
 function validId(value){return /^[0-9a-f-]{36}$/i.test(String(value||""));}
 function validServiceList(values){return values.every(id=>SERVICES[id]) && new Set(values).size===values.length;}
 function normaliseServices(value,fallback){const values=Array.isArray(value)?value:(fallback?[fallback]:[]);return [...new Set(values.map(String).filter(id=>SERVICES[id]))];}
-function normaliseAddons(value){const out={};if(!value||typeof value!=="object")return out;for(const [id,qty] of Object.entries(value)){const n=Math.max(0,Math.min(50,Math.round(Number(qty))));if(ADDONS[id]&&Number.isFinite(n)&&n>0)out[id]=n;}return out;}
+function normaliseAddons(value){const out={};if(!value||typeof value!=="object")return out;for(const [id,qty] of Object.entries(value)){const n=Math.max(0,Math.min(10,Math.round(Number(qty))));if(ADDONS[id]&&Number.isFinite(n)&&n>0)out[id]=n;}return out;}
 function addonTotal(addons){return Object.entries(addons).reduce((sum,[id,qty])=>sum+ADDONS[id][1]*qty,0);}
 function validPayment(value){return ["unpaid","paid","refunded","not-required"].includes(value);}
 function normaliseDate(value){const raw=String(value||"").trim();let m=raw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);if(m){const[,d,mo,y]=m;return validDate(y,mo,d)?`${y}-${mo}-${d}`:"";}m=raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);return m&&validDate(m[1],m[2],m[3])?raw:"";}
