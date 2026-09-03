@@ -74,6 +74,12 @@ describe("production Worker entrypoint", () => {
     expect(body.booking.endTime).toBe("19:30");
     expect(body.booking.durationMinutes).toBe(90);
     expect(body.booking.calendarUrl).toContain(`/calendar/event/${body.booking.id}`);
+
+    const calendarResponse = await request(`/calendar/event/${body.booking.id}`);
+    expect(calendarResponse.status).toBe(200);
+    const calendarHtml = await calendarResponse.text();
+    expect(calendarHtml).toContain("6:00pm–7:30pm");
+    expect(calendarHtml).not.toContain("6:00pm–8:00pm");
   });
 
   it("preserves an existing returning customer's marketing opt-in", async () => {
