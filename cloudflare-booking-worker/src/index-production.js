@@ -1,4 +1,5 @@
 import bookingWorker from "./index-duration.js";
+import { durationForServices } from "./duration-config.js";
 
 const SITE_ORIGINS = new Set(["https://autumnnails.com", "https://www.autumnnails.com"]);
 
@@ -37,6 +38,27 @@ export default {
 
     const response = await bookingWorker.fetch(request, env, ctx);
 
+    // Keep the private admin booking list aligned with the real service duration.
+    if (request.method === "GET" && url.pathname === "/api/admin/bookings" && response.ok) {
+      try {
+        const data = await response.clone().json();
+        if (Array.isArray(data.bookings)) {
+          data.bookings = data.bookings.map(booking => {
+            const serviceIds = serviceIdsForAdminBooking(booking);
+            const duration = durationForServices(serviceIds);
+            return {
+              ...booking,
+              durationMinutes: duration,
+              end_time: addMinutesToTime(booking.start_time, duration)
+            };
+          });
+          return json(data, response.status, origin);
+        }
+      } catch {
+        // If the response is not JSON, return it unchanged.
+      }
+    }
+
     // A normal booking with marketingOptIn=false is not an explicit withdrawal of
     // previously granted consent. Preserve an existing opt-in until an explicit
     // unsubscribe/withdrawal mechanism is provided.
@@ -65,6 +87,34 @@ export default {
   }
 };
 
+function serviceIdsForAdminBooking(booking) {
+  if (Array.isArray(booking.selected_services)) {
+    const ids = booking.selected_services.map(item => typeof item === "string" ? item : item?.id).filter(Boolean);
+    if (ids.length) return ids;
+  }
+  if (typeof booking.selected_services_json === "string") {
+    try {
+      const items = JSON.parse(booking.selected_services_json);
+      const ids = Array.isArray(items) ? items.map(item => typeof item === "string" ? item : item?.id).filter(Boolean) : [];
+      if (ids.length) return ids;
+    } catch {}
+  }
+  if (booking.booked_service_id) return [String(booking.booked_service_id)];
+  if (booking.service_id) return [String(booking.service_id)];
+  const nameToId = {
+    "Basic Manicure": "basic-manicure",
+    "Gel Polish": "gel-polish",
+    "Builder Full Set": "builder-full-set",
+    "Builder Infill": "builder-infill",
+    "Builder & Gel Polish Full Set": "builder-gel-full-set",
+    "Builder & Gel Polish Infill": "builder-gel-infill",
+    "Acrylic – Full Set": "acrylic-full-set",
+    "Express Gel Toes": "express-gel-toes"
+  };
+  const names = String(booking.bookedService || "").split(" + ").map(value => value.trim()).filter(Boolean);
+  return names.map(name => nameToId[name]).filter(Boolean);
+}
+
 export function isPastLondonSlot(date, startTime, now = new Date()) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date || "")) || !/^\d{2}:\d{2}$/.test(String(startTime || ""))) return false;
   const nowParts = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/London", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(now);
@@ -78,6 +128,12 @@ export function isPastLondonSlot(date, startTime, now = new Date()) {
 
 function normaliseEmail(value) {
   return String(value || "").trim().toLowerCase();
+}
+
+function addMinutesToTime(time, minutes) {
+  const [hour, minute] = String(time || "00:00").split(":").map(Number);
+  const total = hour * 60 + minute + Number(minutes || 0);
+  return `${String(Math.floor(total / 60) % 24).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
 }
 
 function corsHeaders(origin) {
