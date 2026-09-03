@@ -7,6 +7,10 @@ on:
     paths:
       - "cloudflare-booking-worker/**"
       - ".github/workflows/deploy-booking-worker.yml"
+  pull_request:
+    paths:
+      - "cloudflare-booking-worker/**"
+      - ".github/workflows/deploy-booking-worker.yml"
   workflow_dispatch:
 
 permissions:
@@ -16,7 +20,31 @@ env:
   CLOUDFLARE_ACCOUNT_ID: d94904809c2530355a903bbeb3306c03
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: cloudflare-booking-worker
+    steps:
+      - name: Check out Worker source
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: cloudflare-booking-worker/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Run Worker regression tests
+        run: npm test
+
   deploy:
+    if: github.event_name != 'pull_request'
+    needs: test
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
