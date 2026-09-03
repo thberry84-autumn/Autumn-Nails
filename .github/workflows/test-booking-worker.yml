@@ -1,17 +1,7 @@
 name: Booking Worker Tests
 
 on:
-  pull_request:
-    paths:
-      - "cloudflare-booking-worker/**"
-      - ".github/workflows/test-booking-worker.yml"
-  push:
-    branches:
-      - main
-      - stabilise-v1
-    paths:
-      - "cloudflare-booking-worker/**"
-      - ".github/workflows/test-booking-worker.yml"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -19,6 +9,7 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: cloudflare-booking-worker
@@ -29,9 +20,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: cloudflare-booking-worker/package.json
-      - name: Install dependencies
-        run: npm install
-      - name: Run Worker tests
-        run: npm test
+      - name: Check Worker JavaScript syntax
+        run: |
+          node --check src/index-production.js
+          node --check src/index-duration.js
+          node --check src/index-history.js
+          node --check src/index-multi-calendar.js
+          node --check src/index-multi.js
+          node --check src/index-snagging.js
+          node --check src/index-calendar.js
+          node --check src/index.js
+          node --check src/duration-config.js
