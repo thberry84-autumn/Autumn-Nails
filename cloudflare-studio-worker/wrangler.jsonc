@@ -4,6 +4,9 @@
   "main": "src/index.js",
   "compatibility_date": "2026-09-03",
   "workers_dev": false,
+  "routes": [
+    { "pattern": "studio.autumnnails.com", "custom_domain": true }
+  ],
   "assets": {
     "directory": "./public",
     "html_handling": "auto-trailing-slash",
