@@ -26,12 +26,11 @@ export default {
     const url = new URL(request.url);
     const origin = STUDIO_ORIGIN;
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors(origin) });
-
     try {
-      const identity = await requireAccess(ctx, origin);
+      const identity = await requireAccess(ctx);
       if (url.pathname === "/health" && request.method === "GET") return json({ ok: true, service: "autumn-nails-studio-api" }, 200, origin);
       if (url.pathname === "/api/me" && request.method === "GET") return json({ email: identity.email || null, name: identity.name || null }, 200, origin);
-      if (url.pathname === "/api/services" && request.method === "GET") return json({ services: SERVICES, addons: ADDONS }, 200, origin, { "Cache-Control": "no-store" });
+      if (url.pathname === "/api/services" && request.method === "GET") return json({ services: SERVICES, addons: ADDONS }, 200, origin);
       if (url.pathname === "/api/availability" && request.method === "GET") return await availability(env, origin);
       if (url.pathname === "/api/availability" && request.method === "POST") return await addAvailability(request, env, origin);
       if (url.pathname.startsWith("/api/availability/") && request.method === "DELETE") return await deleteAvailability(url, env, origin);
@@ -43,7 +42,7 @@ export default {
       if (url.pathname.startsWith("/api/clients/") && url.pathname.endsWith("/history") && request.method === "GET") return await clientHistory(url, env, origin);
       if (url.pathname === "/api/marketing" && request.method === "GET") return await marketing(env, origin);
       if (url.pathname === "/api/finance" && request.method === "GET") return await finance(env, origin);
-      if (url.pathname === "/api/gallery" && request.method === "GET") return json({ files: await listGallery(env) }, 200, origin, { "Cache-Control": "no-store" });
+      if (url.pathname === "/api/gallery" && request.method === "GET") return json({ files: await listGallery(env) }, 200, origin);
       if (url.pathname === "/api/gallery" && request.method === "POST") return await uploadGallery(request, env, origin);
       if (url.pathname === "/api/gallery/metadata" && request.method === "PUT") return await updateGalleryMetadata(request, env, origin);
       if (url.pathname.startsWith("/api/gallery/") && request.method === "DELETE") return await deleteGallery(url, env, origin);
@@ -56,7 +55,7 @@ export default {
   }
 };
 
-async function requireAccess(ctx, origin) {
+async function requireAccess(ctx) {
   if (!ctx?.access) throw httpError(401, "Studio authentication is required.");
   const identity = await ctx.access.getIdentity();
   if (!identity?.email) throw httpError(403, "Studio identity could not be verified.");
@@ -65,14 +64,14 @@ async function requireAccess(ctx, origin) {
 
 async function availability(env, origin) {
   const result = await env.DB.prepare("SELECT id,date,start_time,service_ids_json,status,created_at,updated_at FROM availability_slots ORDER BY date,start_time").all();
-  return json({ slots: (result.results || []).map(row => ({ ...row, serviceIds: parseJson(row.service_ids_json, []) })) }, 200, origin, { "Cache-Control": "no-store" });
+  return json({ slots: (result.results || []).map(row => ({ ...row, serviceIds: parseJson(row.service_ids_json, []) })) }, 200, origin);
 }
 
 async function addAvailability(request, env, origin) {
   const body = await request.json();
   const date = cleanDate(body.date), startTime = cleanTime(body.startTime);
   const serviceIds = Array.isArray(body.serviceIds) ? [...new Set(body.serviceIds.map(String).filter(id => SERVICE_BY_ID.has(id)))] : [];
-  if (!date || !startTime) return json({ error: "Please provide a date and time." }, 400, origin);
+  if (!date || !startTime) return json({ error: "Please provide a valid date and time." }, 400, origin);
   const now = new Date().toISOString();
   try {
     const result = await env.DB.prepare("INSERT INTO availability_slots (date,start_time,service_ids_json,status,created_at,updated_at) VALUES (?,?,?,'available',?,?)").bind(date,startTime,JSON.stringify(serviceIds),now,now).run();
@@ -95,13 +94,13 @@ async function deleteAvailability(url, env, origin) {
 
 async function bookings(env, origin) {
   const result = await env.DB.prepare(`SELECT b.id,b.date,b.start_time,b.service_id,b.booked_service_id,b.selected_services_json,b.addons_json,b.price_pence,b.price_adjustment_pence,b.final_price_pence,b.payment_status,b.status,b.created_at,b.updated_at,c.id AS client_id,c.first_name,c.surname,c.email,c.phone FROM bookings b JOIN clients c ON c.id=b.client_id ORDER BY b.date DESC,b.start_time DESC`).all();
-  return json({ bookings: (result.results || []).map(row => ({ ...row, selectedServices: parseJson(row.selected_services_json, []), addons: parseJson(row.addons_json, {}), finalPricePence: Number(row.final_price_pence ?? row.price_pence ?? 0), priceAdjustmentPence: Number(row.price_adjustment_pence || 0) })) }, 200, origin, { "Cache-Control": "no-store" });
+  return json({ bookings: (result.results || []).map(row => ({ ...row, selectedServices: parseJson(row.selected_services_json, []), addons: parseJson(row.addons_json, {}), finalPricePence: Number(row.final_price_pence ?? row.price_pence ?? 0), priceAdjustmentPence: Number(row.price_adjustment_pence || 0) })) }, 200, origin);
 }
 
 async function updateBooking(url, request, env, origin) {
   const id = String(url.pathname.split("/").pop());
   const body = await request.json();
-  if (!/^[0-9a-f-]{36}$/i.test(id)) return json({ error: "Invalid booking." }, 400, origin);
+  if (!validId(id)) return json({ error: "Invalid booking." }, 400, origin);
   const current = await env.DB.prepare("SELECT * FROM bookings WHERE id=? LIMIT 1").bind(id).first();
   if (!current) return json({ error: "Booking not found." }, 404, origin);
   const allowedStatus = new Set(["confirmed","completed","cancelled"]);
@@ -123,7 +122,7 @@ async function updateBooking(url, request, env, origin) {
 
 async function clients(env, origin) {
   const result = await env.DB.prepare(`SELECT c.id,c.first_name,c.surname,c.email,c.phone,c.marketing_opt_in,c.created_at,c.updated_at,COUNT(b.id) AS booking_count,MAX(b.date) AS last_booking_date FROM clients c LEFT JOIN bookings b ON b.client_id=c.id GROUP BY c.id ORDER BY c.surname,c.first_name`).all();
-  return json({ clients: result.results || [] }, 200, origin, { "Cache-Control": "no-store" });
+  return json({ clients: result.results || [] }, 200, origin);
 }
 
 async function createClient(request, env, origin) {
@@ -143,7 +142,7 @@ async function createClient(request, env, origin) {
 
 async function updateClient(url, request, env, origin) {
   const id = decodeURIComponent(url.pathname.split("/").pop());
-  if (!/^[0-9a-f-]{36}$/i.test(id)) return json({ error: "Invalid client." }, 400, origin);
+  if (!validId(id)) return json({ error: "Invalid client." }, 400, origin);
   const body = await request.json();
   const current = await env.DB.prepare("SELECT * FROM clients WHERE id=? LIMIT 1").bind(id).first();
   if (!current) return json({ error: "Client not found." }, 404, origin);
@@ -161,23 +160,23 @@ async function updateClient(url, request, env, origin) {
 
 async function clientHistory(url, env, origin) {
   const id = decodeURIComponent(url.pathname.split("/")[3] || "");
-  if (!/^[0-9a-f-]{36}$/i.test(id)) return json({ error: "Invalid client." }, 400, origin);
+  if (!validId(id)) return json({ error: "Invalid client." }, 400, origin);
   const client = await env.DB.prepare("SELECT id,first_name,surname FROM clients WHERE id=? LIMIT 1").bind(id).first();
   if (!client) return json({ error: "Client not found." }, 404, origin);
   const result = await env.DB.prepare(`SELECT b.id,b.date,b.start_time,b.service_id,b.booked_service_id,b.selected_services_json,b.addons_json,b.price_pence,b.price_adjustment_pence,b.final_price_pence,b.payment_status,b.status,b.created_at,(SELECT e.metadata_json FROM booking_events e WHERE e.booking_id=b.id AND e.event_type IN ('completed_treatment_added','completed_treatment_updated') ORDER BY e.created_at DESC LIMIT 1) AS history_metadata FROM bookings b WHERE b.client_id=? ORDER BY b.date DESC,b.start_time DESC`).bind(id).all();
-  return json({ client, history: (result.results || []).map(row => ({ ...row, selectedServices: parseJson(row.selected_services_json, []), addons: parseJson(row.addons_json, {}), metadata: parseJson(row.history_metadata, {}) })) }, 200, origin, { "Cache-Control": "no-store" });
+  return json({ client, history: (result.results || []).map(row => ({ ...row, selectedServices: parseJson(row.selected_services_json, []), addons: parseJson(row.addons_json, {}), metadata: parseJson(row.history_metadata, {}) })) }, 200, origin);
 }
 
 async function marketing(env, origin) {
   const result = await env.DB.prepare("SELECT id,first_name,surname,email,phone,updated_at FROM clients WHERE marketing_opt_in=1 ORDER BY surname,first_name").all();
-  return json({ contacts: result.results || [] }, 200, origin, { "Cache-Control": "no-store" });
+  return json({ contacts: result.results || [] }, 200, origin);
 }
 
 async function finance(env, origin) {
   const result = await env.DB.prepare(`SELECT b.id,b.date,b.start_time,b.price_pence,b.price_adjustment_pence,b.final_price_pence,b.payment_status,b.status,c.first_name,c.surname,c.email FROM bookings b JOIN clients c ON c.id=b.client_id ORDER BY b.date DESC,b.start_time DESC`).all();
   const rows = result.results || [];
   const totals = rows.reduce((acc,row) => { const value = Number(row.final_price_pence ?? row.price_pence ?? 0); acc.booked += value; if (row.payment_status === "paid") acc.paid += value; if (row.payment_status === "unpaid") acc.unpaid += value; return acc; }, { booked:0, paid:0, unpaid:0 });
-  return json({ rows, totals }, 200, origin, { "Cache-Control": "no-store" });
+  return json({ rows, totals }, 200, origin);
 }
 
 async function listGallery(env) {
@@ -213,7 +212,7 @@ async function uploadGallery(request, env, origin) {
   }
   metadata._order = unique(order);
   await saveCaptions(metadata,env,"Add nail gallery photos");
-  return json({ok:true,uploaded},200,origin,{"Cache-Control":"no-store"});
+  return json({ok:true,uploaded},200,origin);
 }
 
 async function updateGalleryMetadata(request, env, origin) {
@@ -230,12 +229,12 @@ async function updateGalleryMetadata(request, env, origin) {
     metadata._homepage = homepage;
   }
   await saveCaptions(metadata,env,"Update nail gallery settings");
-  return json({ok:true,files:await listGallery(env)},200,origin,{"Cache-Control":"no-store"});
+  return json({ok:true,files:await listGallery(env)},200,origin);
 }
 
 async function deleteGallery(url, env, origin) {
   const name = decodeURIComponent(url.pathname.slice("/api/gallery/".length));
-  if (!/^[\\w .()\\-]+\\.(jpe?g|png|webp)$/i.test(name)) return json({error:"Invalid filename."},400,origin);
+  if (!/^[\w .()\-]+\.(jpe?g|png|webp)$/i.test(name)) return json({error:"Invalid filename."},400,origin);
   if (!await env.BUCKET.head(name)) return json({error:"Photo not found."},404,origin);
   await env.BUCKET.delete(name);
   const metadata = await getCaptions(env);
@@ -243,7 +242,7 @@ async function deleteGallery(url, env, origin) {
   metadata._order = (Array.isArray(metadata._order) ? metadata._order : []).filter(v => v !== name);
   if (metadata._homepage === name) metadata._homepage = metadata._order[0] || "";
   await saveCaptions(metadata,env,"Delete nail gallery photo");
-  return json({ok:true},200,origin,{"Cache-Control":"no-store"});
+  return json({ok:true},200,origin);
 }
 
 async function getCaptions(env) {
@@ -266,10 +265,11 @@ async function githubRequest(path,token,options={}) { return fetch(`${GITHUB_API
 function makeFilename(original) { const extension = original.toLowerCase().match(/\.(jpe?g|png|webp)$/)?.[1] || "jpg"; const base = original.replace(/\.[^.]+$/," ").replace(/[^a-z0-9]+/gi,"-").replace(/^-+|-+$/g,"").slice(0,50) || "nail-set"; const stamp = new Date().toISOString().replace(/[:.]/g,"-"); return `${stamp}-${crypto.randomUUID().slice(0,8)}-${base}.${extension}`; }
 function parseJson(value,fallback) { try { const parsed = JSON.parse(value ?? ""); return parsed ?? fallback; } catch { return fallback; } }
 function unique(values) { return [...new Set(values)]; }
+function validId(value) { return /^[0-9a-f-]{36}$/i.test(String(value)); }
 function normaliseEmail(value) { return String(value || "").trim().toLowerCase().slice(0,254); }
 function cleanText(value,max) { return String(value || "").trim().replace(/\s+/g," ").slice(0,max); }
-function cleanDate(value) { const v=String(value || ""); return /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : ""; }
-function cleanTime(value) { const v=String(value || ""); return /^\d{2}:\d{2}$/.test(v) ? v : ""; }
+function cleanDate(value) { const v=String(value || ""); if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return ""; const [year,month,day]=v.split("-").map(Number); const d=new Date(Date.UTC(year,month-1,day)); return d.getUTCFullYear()===year && d.getUTCMonth()===month-1 && d.getUTCDate()===day ? v : ""; }
+function cleanTime(value) { const v=String(value || ""); if (!/^\d{2}:\d{2}$/.test(v)) return ""; const [hour,minute]=v.split(":").map(Number); return hour <= 23 && minute <= 59 ? v : ""; }
 function toBase64(bytes) { let binary=""; for(let i=0;i<bytes.length;i+=0x8000) binary += String.fromCharCode(...bytes.subarray(i,i+0x8000)); return btoa(binary); }
 function httpError(status,message) { const error = new Error(message); error.status = status; return error; }
 function cors(origin) { return { "Access-Control-Allow-Origin":origin,"Access-Control-Allow-Credentials":"true","Access-Control-Allow-Headers":"Content-Type","Access-Control-Allow-Methods":"GET,POST,PATCH,PUT,DELETE,OPTIONS","Vary":"Origin","X-Content-Type-Options":"nosniff","Referrer-Policy":"no-referrer","X-Frame-Options":"DENY","Permissions-Policy":"camera=(), microphone=(), geolocation=()","Cache-Control":"no-store" }; }
