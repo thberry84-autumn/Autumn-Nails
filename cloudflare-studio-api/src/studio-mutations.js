@@ -13,6 +13,7 @@ async function requireAccess(ctx){
 
 export async function handleStudioMutation(request,env,ctx,origin,pathname){
   if(request.method!=="POST")return null;
+
   if(pathname.startsWith("/api/availability/")&&pathname.endsWith("/remove")){
     await requireAccess(ctx);
     const id=Number(pathname.split("/").slice(-2,-1)[0]);
@@ -22,7 +23,7 @@ export async function handleStudioMutation(request,env,ctx,origin,pathname){
     if(row.status==="booked")return json({error:"A booked appointment space cannot be removed. Cancel the booking instead."},409,origin);
     if(row.removed_at)return json({ok:true},200,origin);
     const now=new Date().toISOString();
-    await env.DB.prepare("UPDATE availability_slots SET removed_at=?,updated_at=? WHERE id=?").bind(now,now,id).run();
+    await env.DB.prepare("UPDATE availability_slots SET removed_at=?,updated_at=? WHERE id=? AND removed_at IS NULL").bind(now,now,id).run();
     return json({ok:true},200,origin);
   }
 
@@ -32,16 +33,31 @@ export async function handleStudioMutation(request,env,ctx,origin,pathname){
     if(!validId(id))return json({error:"Invalid booking."},400,origin);
     const current=await env.DB.prepare("SELECT id,status,slot_id FROM bookings WHERE id=? LIMIT 1").bind(id).first();
     if(!current)return json({error:"Booking not found."},404,origin);
-    if(current.status==="cancelled")return json({ok:true},200,origin);
     if(!current.slot_id)return json({error:"This booking has no linked appointment space."},409,origin);
-    const slot=await env.DB.prepare("SELECT id,status FROM availability_slots WHERE id=? LIMIT 1").bind(current.slot_id).first();
+    const slot=await env.DB.prepare("SELECT id,status,removed_at FROM availability_slots WHERE id=? LIMIT 1").bind(current.slot_id).first();
     if(!slot)return json({error:"The linked appointment space could not be found."},409,origin);
-    if(slot.status!=="booked")return json({error:"The linked appointment space is no longer marked as booked."},409,origin);
+    if(slot.removed_at)return json({error:"The linked appointment space has been removed and cannot be released."},409,origin);
+
     const now=new Date().toISOString();
     try {
-      await env.DB.prepare("UPDATE bookings SET status='cancelled',updated_at=? WHERE id=? AND status!='cancelled'").bind(now,id).run();
-      await env.DB.prepare("UPDATE availability_slots SET status='available',updated_at=? WHERE id=? AND status='booked'").bind(now,current.slot_id).run();
-      await env.DB.prepare("INSERT INTO booking_events (id,booking_id,event_type,metadata_json,created_at) VALUES (?,?,?,?,?)").bind(crypto.randomUUID(),id,"studio_booking_updated",JSON.stringify({status:"cancelled",reason:"studio_cancel"}),now).run();
+      if(current.status==="cancelled"){
+        // Repair an inconsistent cancelled booking whose slot was left booked.
+        if(slot.status==="booked"){
+          await env.DB.batch([
+            env.DB.prepare("UPDATE availability_slots SET status='available',updated_at=? WHERE id=? AND status='booked'").bind(now,current.slot_id),
+            env.DB.prepare("INSERT INTO booking_events (id,booking_id,event_type,metadata_json,created_at) VALUES (?,?,?,?,?)").bind(crypto.randomUUID(),id,"studio_booking_updated",JSON.stringify({status:"cancelled",reason:"studio_cancel_repair"}),now)
+          ]);
+        }
+        return json({ok:true},200,origin);
+      }
+
+      if(slot.status!=="booked")return json({error:"The linked appointment space is no longer marked as booked."},409,origin);
+
+      await env.DB.batch([
+        env.DB.prepare("UPDATE bookings SET status='cancelled',updated_at=? WHERE id=? AND status!='cancelled'").bind(now,id),
+        env.DB.prepare("UPDATE availability_slots SET status='available',updated_at=? WHERE id=? AND status='booked'").bind(now,current.slot_id),
+        env.DB.prepare("INSERT INTO booking_events (id,booking_id,event_type,metadata_json,created_at) VALUES (?,?,?,?,?)").bind(crypto.randomUUID(),id,"studio_booking_updated",JSON.stringify({status:"cancelled",reason:"studio_cancel"}),now)
+      ]);
     } catch(error) {
       console.error("Studio cancellation failed", error);
       throw httpError(500,`Could not cancel appointment: ${String(error?.message||error)}`);
