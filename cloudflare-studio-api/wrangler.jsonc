@@ -1,0 +1,33 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "autumn-nails-studio-api",
+  "main": "src/entry.js",
+  "compatibility_date": "2026-09-03",
+  "workers_dev": false,
+  "routes": [
+    { "pattern": "studio-booking-api.autumnnails.com", "custom_domain": true },
+    { "pattern": "studio-media-api.autumnnails.com", "custom_domain": true }
+  ],
+  "dev": {
+    "access": {
+      "aud": "autumn-nails-studio-local",
+      "identity": { "email": "studio-test@localhost" }
+    }
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "autumn-nails-booking",
+      "database_id": "b89756f2-4282-4af0-908a-095b130f5f97"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "BUCKET",
+      "bucket_name": "autumn-nails-images"
+    }
+  ],
+  "secrets": {
+    "required": ["GITHUB_TOKEN"]
+  }
+}
