@@ -1,1 +1,0 @@
-Temporary deployment marker for same-origin payment amendment fix.
