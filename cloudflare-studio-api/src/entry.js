@@ -16,9 +16,9 @@ export default {
         const response = await handleStudioMutation(request, env, ctx, origin, url.pathname);
         if (response) return response;
       } catch (error) {
+        console.error("Studio mutation failed", error);
         if (error?.status) return json({ error: error.message }, error.status, origin);
-        console.error(error);
-        return json({ error: "Something went wrong. Please try again." }, 500, origin);
+        return json({ error: `Studio mutation failed: ${String(error?.message || error)}` }, 500, origin);
       }
     }
     if (request.method === "PATCH" && url.pathname.startsWith("/api/bookings/")) {
