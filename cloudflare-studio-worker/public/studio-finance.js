@@ -105,8 +105,6 @@
       save.disabled = true; cancel.disabled = true; close.disabled = true; message.textContent = 'Saving…';
       try {
         const result = await savePayment(bookingId, { priceAdjustmentPence: adjustmentPence, paymentStatus: payment.value });
-        // The PATCH response is the authoritative save result. Do not let a
-        // later finance refresh failure turn a successful save into "Load failed".
         message.textContent = 'Saved';
         backdrop.remove();
         button.disabled = false;
@@ -149,4 +147,19 @@
 
   if (location.hash.slice(1) === 'finance') loadFinanceSameOrigin();
   window.addEventListener('hashchange', () => { if (location.hash.slice(1) === 'finance') loadFinanceSameOrigin(); });
+})();
+
+(() => {
+  const loadGalleryControls = () => {
+    if (location.hash.slice(1) !== 'photos') return;
+    if (window.__studioGalleryLoading) return;
+    window.__studioGalleryLoading = true;
+    const script = document.createElement('script');
+    script.src = '/studio-gallery.js?v=20260904a';
+    script.onload = () => { window.__studioGalleryLoading = false; };
+    script.onerror = () => { window.__studioGalleryLoading = false; console.error('Studio gallery controls failed to load'); };
+    document.body.appendChild(script);
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', loadGalleryControls); else loadGalleryControls();
+  window.addEventListener('hashchange', loadGalleryControls);
 })();
