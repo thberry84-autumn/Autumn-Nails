@@ -16,6 +16,23 @@ export default {
       return json({ rows, totals }, 200);
     }
 
+    if (url.pathname === "/api/studio/availability" && request.method === "POST") {
+      let body;
+      try { body = await request.json(); } catch { return json({ error: "Invalid request body." }, 400); }
+      const date = cleanDate(body.date);
+      const startTime = cleanTime(body.startTime);
+      const serviceIds = Array.isArray(body.serviceIds) ? [...new Set(body.serviceIds.map(String).filter(Boolean))] : [];
+      if (!date || !startTime) return json({ error: "Please provide a valid date and time." }, 400);
+      const now = new Date().toISOString();
+      try {
+        const result = await env.DB.prepare("INSERT INTO availability_slots (date,start_time,service_ids_json,status,created_at,updated_at) VALUES (?,?,?,'available',?,?)").bind(date, startTime, JSON.stringify(serviceIds), now, now).run();
+        return json({ ok: true, id: result.meta.last_row_id }, 201);
+      } catch (error) {
+        if (String(error?.message || error).toLowerCase().includes("unique")) return json({ error: "That appointment space already exists." }, 409);
+        throw error;
+      }
+    }
+
     if (url.pathname.startsWith("/api/studio/bookings/") && request.method === "PATCH") {
       const id = String(url.pathname.split("/").pop());
       if (!/^[0-9a-f-]{36}$/i.test(id)) return json({ error: "Invalid booking." }, 400);
@@ -56,7 +73,7 @@ export default {
       .replace("if(name==='clients')loadClients()", "if(name==='clients')void 0");
     const footer = `<footer><div class="wrap footer-grid"><div><a class="brand" href="https://autumnnails.com"><strong>Autumn</strong><span>Nails</span></a><div class="small" style="margin-top:10px">A calm little space for beautiful nails.</div><div class="small" style="margin-top:14px">Studio</div></div><div class="footer-links"><a href="https://autumnnails.com">Customer website</a><a href="https://autumnnails.com/services.html">Services &amp; Booking</a><a href="https://autumnnails.com/gallery.html">Gallery</a><a href="https://autumnnails.com/contact.html">Contact</a></div></div></footer>`;
     const styles = '<link rel="stylesheet" href="/studio.css?v=20260904i"><link rel="stylesheet" href="/studio-payment-amend.css?v=20260904b">';
-    const scripts = '<script src="/studio-actions.js?v=20260904f"></script><script src="/studio-calendar.js?v=20260904f"></script><script src="/studio-booking-fixes.js?v=20260904f"></script><script src="/studio-finance.js?v=20260904f"></script><script src="/studio-clients.js?v=20260904c"></script><script>(function(){const clean=()=>document.querySelectorAll("style#studio-polish-css,style:not([id])").forEach(s=>{if(s.id==="studio-polish-css"||s.textContent.includes("#studioCalendar{"))s.remove()});new MutationObserver(clean).observe(document.head,{childList:true});clean()})();</script>';
+    const scripts = '<script src="/studio-actions.js?v=20260904f"></script><script src="/studio-calendar.js?v=20260904f"></script><script src="/studio-booking-fixes.js?v=20260904f"></script><script src="/studio-finance.js?v=20260904f"></script><script src="/studio-clients.js?v=20260904c"></script><script src="/studio-availability-fix.js?v=20260904a"></script><script>(function(){const clean=()=>document.querySelectorAll("style#studio-polish-css,style:not([id])").forEach(s=>{if(s.id==="studio-polish-css"||s.textContent.includes("#studioCalendar{"))s.remove()});new MutationObserver(clean).observe(document.head,{childList:true});clean()})();</script>';
     const finalHtml = withoutLegacyFinanceLoad.replace(/<\/head>/i, `${styles}</head>`).replace(/<\/body>/i, `${footer}${scripts}</body>`);
     const headers = new Headers(response.headers); headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
     return new Response(finalHtml, { status: response.status, statusText: response.statusText, headers });
@@ -102,6 +119,8 @@ async function studioClientHistory(url, env) {
   return json({ client, history:(result.results||[]).map(row=>({ ...row, metadata:parseJson(row.history_metadata,{}) })) });
 }
 
+function cleanDate(value){const s=String(value||'').trim();return /^\d{4}-\d{2}-\d{2}$/.test(s)?s:''}
+function cleanTime(value){const s=String(value||'').trim();return /^\d{2}:\d{2}$/.test(s)?s:''}
 function cleanText(value,max){return String(value||'').trim().replace(/\s+/g,' ').slice(0,max)}
 function normaliseEmail(value){return String(value||'').trim().toLowerCase().slice(0,254)}
 function validId(value){return /^[0-9a-f-]{36}$/i.test(String(value))}
