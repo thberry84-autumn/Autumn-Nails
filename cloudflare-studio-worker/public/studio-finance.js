@@ -2,6 +2,7 @@
   const API = 'https://studio-booking-api.autumnnails.com';
   const moneyToPence = value => Math.round((Number(value) || 0) * 100);
   const escapeHtml = value => String(value ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;').replace(/'/g,'&#39;');
+  const money = pence => '£' + (Number(pence || 0) / 100).toFixed(2);
 
   async function request(path, options = {}) {
     if (typeof window.api === 'function') return window.api(API, path, options);
@@ -9,6 +10,88 @@
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.error || `Request failed (${response.status})`);
     return data;
+  }
+
+  function closeModal(modal, button) {
+    modal?.remove();
+    if (button) button.disabled = false;
+  }
+
+  function openAmendModal({ bookingId, client, date, originalPence, adjustmentText, paymentText, button }) {
+    if (document.querySelector('.finance-amend-backdrop')) return;
+    button.disabled = true;
+    const currentAdjustment = Number(adjustmentText.replace(/£/g, '').trim()) || 0;
+    const currentPayment = ['unpaid','paid','refunded','not-required'].includes(paymentText) ? paymentText : 'unpaid';
+    const backdrop = document.createElement('div');
+    backdrop.className = 'finance-amend-backdrop';
+    backdrop.innerHTML = `
+      <section class="finance-amend-modal" role="dialog" aria-modal="true" aria-labelledby="finance-amend-title">
+        <div class="finance-amend-dialog">
+          <button type="button" class="finance-amend-close" aria-label="Close">×</button>
+          <div class="kicker">Payment</div>
+          <h2 id="finance-amend-title">Amend payment</h2>
+          <p class="muted">Adjust the final charge or update the payment status for this booking.</p>
+          <div class="finance-amend-summary"><strong>${escapeHtml(client)}</strong><br>${escapeHtml(date)} · Original charge ${money(originalPence)}</div>
+          <div class="finance-amend-fields">
+            <label>Adjustment £<input class="finance-adjustment" type="number" step="0.01" value="${escapeHtml(currentAdjustment.toFixed(2))}" inputmode="decimal"></label>
+            <label>Payment<select class="finance-payment">
+              <option value="unpaid">Unpaid</option>
+              <option value="paid">Paid</option>
+              <option value="refunded">Refunded</option>
+              <option value="not-required">Not required</option>
+            </select></label>
+          </div>
+          <div class="finance-amend-preview"><span>Final charge</span><strong class="finance-final-preview">${money(originalPence + moneyToPence(currentAdjustment))}</strong></div>
+          <div class="actions"><span class="msg finance-amend-msg"></span><button type="button" class="button secondary finance-cancel">Cancel</button><button type="button" class="button finance-save">Save changes</button></div>
+        </div>
+      </section>`;
+    document.body.appendChild(backdrop);
+
+    const input = backdrop.querySelector('.finance-adjustment');
+    const payment = backdrop.querySelector('.finance-payment');
+    const preview = backdrop.querySelector('.finance-final-preview');
+    const save = backdrop.querySelector('.finance-save');
+    const cancel = backdrop.querySelector('.finance-cancel');
+    const close = backdrop.querySelector('.finance-amend-close');
+    const message = backdrop.querySelector('.finance-amend-msg');
+    payment.value = currentPayment;
+
+    const updatePreview = () => preview.textContent = money(originalPence + moneyToPence(input.value));
+    input.addEventListener('input', updatePreview);
+    const dismiss = () => closeModal(backdrop, button);
+    close.addEventListener('click', dismiss);
+    cancel.addEventListener('click', dismiss);
+    backdrop.addEventListener('click', event => { if (event.target === backdrop) dismiss(); });
+    document.addEventListener('keydown', function onKey(event) { if (event.key === 'Escape') { dismiss(); document.removeEventListener('keydown', onKey); } }, { once: true });
+
+    save.addEventListener('click', async () => {
+      const adjustmentPence = moneyToPence(input.value);
+      if (!Number.isFinite(adjustmentPence) || adjustmentPence < -100000 || adjustmentPence > 100000) {
+        message.textContent = 'Enter an adjustment between -£1,000 and £1,000.';
+        return;
+      }
+      save.disabled = true;
+      cancel.disabled = true;
+      close.disabled = true;
+      message.textContent = 'Saving…';
+      try {
+        await request('/api/bookings/' + encodeURIComponent(bookingId), {
+          method: 'PATCH',
+          body: JSON.stringify({ priceAdjustmentPence: adjustmentPence, paymentStatus: payment.value })
+        });
+        backdrop.remove();
+        button.disabled = false;
+        if (typeof window.loadFinance === 'function') window.loadFinance();
+        else window.location.reload();
+      } catch (error) {
+        message.textContent = error.message || 'Could not save changes.';
+        save.disabled = false;
+        cancel.disabled = false;
+        close.disabled = false;
+      }
+    });
+    input.focus();
+    input.select();
   }
 
   async function enhanceFinance() {
@@ -31,18 +114,15 @@
       header.appendChild(th);
     }
 
-    const bodyRows = [...table.querySelectorAll('tbody tr')];
-    bodyRows.forEach((row, index) => {
+    [...table.querySelectorAll('tbody tr')].forEach((row, index) => {
       if (row.dataset.amendButton === '1') return;
       const cells = [...row.querySelectorAll('td')];
       if (cells.length < 6) return;
-
       const financeRow = rows[index];
       const bookingId = financeRow?.id;
       const actionCell = document.createElement('td');
       actionCell.className = 'finance-actions';
       row.appendChild(actionCell);
-
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'button secondary';
@@ -51,68 +131,16 @@
       if (!bookingId) button.title = 'Booking record could not be matched.';
       actionCell.appendChild(button);
       row.dataset.amendButton = '1';
-
       if (!bookingId) return;
-
-      button.addEventListener('click', () => {
-        if (actionCell.querySelector('.finance-amend')) return;
-        button.disabled = true;
-
-        const adjustmentText = cells[3].textContent.trim().replace(/£/g, '');
-        const paymentText = cells[5].textContent.trim().toLowerCase();
-        const editor = document.createElement('div');
-        editor.className = 'finance-amend';
-        editor.innerHTML = `
-          <div class="finance-amend-grid">
-            <label>Adjustment £<input class="finance-adjustment" type="number" step="0.01" value="${escapeHtml(adjustmentText)}"></label>
-            <label>Payment<select class="finance-payment">
-              <option value="unpaid">Unpaid</option>
-              <option value="paid">Paid</option>
-              <option value="refunded">Refunded</option>
-              <option value="not-required">Not required</option>
-            </select></label>
-            <div class="finance-amend-buttons"><button type="button" class="button finance-save">Save</button><button type="button" class="button secondary finance-cancel">Cancel</button></div>
-            <span class="msg finance-amend-msg"></span>
-          </div>`;
-        actionCell.appendChild(editor);
-
-        const payment = editor.querySelector('.finance-payment');
-        payment.value = ['unpaid','paid','refunded','not-required'].includes(paymentText) ? paymentText : 'unpaid';
-        const input = editor.querySelector('.finance-adjustment');
-        const save = editor.querySelector('.finance-save');
-        const cancel = editor.querySelector('.finance-cancel');
-        const message = editor.querySelector('.finance-amend-msg');
-
-        cancel.addEventListener('click', () => {
-          editor.remove();
-          button.disabled = false;
-        });
-
-        save.addEventListener('click', async () => {
-          const adjustmentPence = moneyToPence(input.value);
-          if (!Number.isFinite(adjustmentPence) || adjustmentPence < -100000 || adjustmentPence > 100000) {
-            message.textContent = 'Enter an adjustment between -£1,000 and £1,000.';
-            return;
-          }
-          save.disabled = true;
-          cancel.disabled = true;
-          message.textContent = 'Saving…';
-          try {
-            await request('/api/bookings/' + encodeURIComponent(bookingId), {
-              method: 'PATCH',
-              body: JSON.stringify({ priceAdjustmentPence: adjustmentPence, paymentStatus: payment.value })
-            });
-            editor.remove();
-            button.disabled = false;
-            if (typeof window.loadFinance === 'function') window.loadFinance();
-            else window.location.reload();
-          } catch (error) {
-            message.textContent = error.message || 'Could not save changes.';
-            save.disabled = false;
-            cancel.disabled = false;
-          }
-        });
-      });
+      button.addEventListener('click', () => openAmendModal({
+        bookingId,
+        client: cells[1].textContent.trim(),
+        date: cells[0].textContent.trim(),
+        originalPence: moneyToPence(cells[2].textContent.trim().replace(/£/g, '')),
+        adjustmentText: cells[3].textContent.trim(),
+        paymentText: cells[5].textContent.trim().toLowerCase(),
+        button
+      }));
     });
 
     table.dataset.amendReady = '1';
