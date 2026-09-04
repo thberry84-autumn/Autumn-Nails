@@ -17,10 +17,12 @@ export async function handleStudioMutation(request,env,ctx,origin,pathname){
     await requireAccess(ctx);
     const id=Number(pathname.split("/").slice(-2,-1)[0]);
     if(!Number.isInteger(id))return json({error:"Invalid appointment space."},400,origin);
-    const row=await env.DB.prepare("SELECT status FROM availability_slots WHERE id=? LIMIT 1").bind(id).first();
+    const row=await env.DB.prepare("SELECT status,removed_at FROM availability_slots WHERE id=? LIMIT 1").bind(id).first();
     if(!row)return json({error:"Appointment space not found."},404,origin);
     if(row.status==="booked")return json({error:"A booked appointment space cannot be removed. Cancel the booking instead."},409,origin);
-    await env.DB.prepare("DELETE FROM availability_slots WHERE id=?").bind(id).run();
+    if(row.removed_at)return json({ok:true},200,origin);
+    const now=new Date().toISOString();
+    await env.DB.prepare("UPDATE availability_slots SET removed_at=?,updated_at=? WHERE id=?").bind(now,now,id).run();
     return json({ok:true},200,origin);
   }
 
