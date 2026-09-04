@@ -1,5 +1,7 @@
 (() => {
   const MEDIA = 'https://studio-media-api.autumnnails.com';
+  const styleHref = '/studio-gallery.css?v=20260904b';
+  if(!document.querySelector(`link[href="${styleHref}"]`)){const link=document.createElement('link');link.rel='stylesheet';link.href=styleHref;document.head.appendChild(link)}
   const esc = v => String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;').replace(/'/g,'&#39;');
   const gallery = () => document.getElementById('gallery');
   const write = body => {
