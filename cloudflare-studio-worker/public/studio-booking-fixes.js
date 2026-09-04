@@ -1,6 +1,6 @@
 (() => {
   const API = 'https://studio-booking-api.autumnnails.com';
-  const MIN_TIME = '06:00';
+  const MIN_TIME = '09:00';
   const MAX_TIME = '22:00';
 
   function installPickerFixes() {
@@ -32,7 +32,7 @@
       if (!picker) return;
 
       const values = [];
-      for (let mins = 6 * 60; mins <= 22 * 60; mins += 15) {
+      for (let mins = 9 * 60; mins <= 22 * 60; mins += 15) {
         const h = Math.floor(mins / 60);
         const m = mins % 60;
         values.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
