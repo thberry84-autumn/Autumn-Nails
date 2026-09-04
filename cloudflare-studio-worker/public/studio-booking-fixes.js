@@ -27,18 +27,19 @@
 
       const wrap = input.closest('.time-picker-wrap');
       if (!wrap) return;
+      if (wrap.dataset.studioTimeRangeFixed === '1') return;
 
-      // The picker should offer the complete working range, 06:00–22:00.
-      // Rebuild its choices from the allowed range so there is no stale
-      // weekend-only restriction left behind in the original picker.
       const picker = wrap.querySelector('.time-picker-popover');
       if (!picker) return;
+
+      // Build the complete working range once. The MutationObserver below
+      // watches child changes, so repeatedly assigning innerHTML here would
+      // create an endless mutation loop and leave Studio stuck on Loading.
       const values = [];
       for (let mins = 6 * 60; mins <= 22 * 60; mins += 15) {
         const h = Math.floor(mins / 60);
         const m = mins % 60;
-        const value = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-        values.push(value);
+        values.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
       }
       const current = input.value || MIN_TIME;
       picker.innerHTML = values.map(value =>
@@ -51,6 +52,7 @@
       if (button && (!button.textContent || button.textContent === 'Choose time')) {
         button.textContent = current;
       }
+      wrap.dataset.studioTimeRangeFixed = '1';
     });
   }
 
