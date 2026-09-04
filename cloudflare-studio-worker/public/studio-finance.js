@@ -4,14 +4,6 @@
   const escapeHtml = value => String(value ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;').replace(/'/g,'&#39;');
   const money = pence => '£' + (Number(pence || 0) / 100).toFixed(2);
 
-  async function request(path, options = {}) {
-    if (typeof window.api === 'function') return window.api(API, path, options);
-    const response = await fetch(API + path, { credentials: 'include', ...options, headers: { 'Content-Type': 'application/json', ...(options.headers || {}) } });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data.error || `Request failed (${response.status})`);
-    return data;
-  }
-
   async function sameOriginFinance() {
     const response = await fetch('/api/studio/finance', { credentials: 'include', cache: 'no-store' });
     const data = await response.json().catch(() => ({}));
@@ -43,8 +35,19 @@
     }
   }
 
-  // Replace the legacy cross-origin finance loader with the same-origin one.
-  // This also fixes the first visit to #finance, which runs before this script.
+  // setView() in the original Studio page calls the legacy global api() helper
+  // directly. Redirect only its finance GET to the same-origin route so the
+  // old cross-origin loader cannot overwrite the working finance screen.
+  const originalApi = window.api;
+  if (typeof originalApi === 'function') {
+    window.api = function(base, path, options = {}) {
+      if (base === API && path === '/api/finance' && (!options.method || options.method === 'GET')) {
+        return sameOriginFinance();
+      }
+      return originalApi(base, path, options);
+    };
+  }
+
   window.loadFinance = loadFinanceSameOrigin;
 
   async function savePayment(bookingId, payload) {
@@ -151,7 +154,8 @@
     table.dataset.amendReady = '1';
   }
 
-  // The legacy loader may already have run on the first page load. Replace its
-  // output immediately if Payments is the current view.
   if (location.hash.slice(1) === 'finance') loadFinanceSameOrigin();
+  window.addEventListener('hashchange', () => {
+    if (location.hash.slice(1) === 'finance') loadFinanceSameOrigin();
+  });
 })();
