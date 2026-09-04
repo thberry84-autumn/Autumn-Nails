@@ -6,12 +6,37 @@ import { handleStudioMutation } from "./studio-mutations.js";
 import { handlePaymentAmend } from "./payment-amend.js";
 
 const STUDIO_ORIGIN = "https://studio.autumnnails.com";
+const GALLERY_METADATA = "/api/gallery/metadata";
 
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const origin = STUDIO_ORIGIN;
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors(origin) });
+
+    // Gallery metadata is written by Studio using a simple POST transport.
+    // This avoids an Access-protected CORS preflight in Safari while keeping
+    // the existing authenticated PUT implementation as the source of truth.
+    if (request.method === "POST" && url.pathname === GALLERY_METADATA) {
+      try {
+        const type = request.headers.get("content-type") || "";
+        let body;
+        if (type.includes("application/x-www-form-urlencoded")) {
+          const form = await request.formData();
+          body = JSON.parse(String(form.get("payload") || "{}"));
+        } else {
+          body = await request.json();
+        }
+        const headers = new Headers(request.headers);
+        headers.set("Content-Type", "application/json");
+        const translated = new Request(request, { method: "PUT", headers, body: JSON.stringify(body) });
+        return studioWorker.fetch(translated, env, ctx);
+      } catch (error) {
+        if (error?.status) return json({ error: error.message }, error.status, origin);
+        console.error("Gallery metadata transport failed", error);
+        return json({ error: "Invalid gallery update." }, 400, origin);
+      }
+    }
 
     if (request.method === "GET" && url.pathname === "/api/availability") {
       try {
