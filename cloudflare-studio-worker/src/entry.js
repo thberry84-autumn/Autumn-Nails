@@ -1,6 +1,6 @@
 import studioWorker from "./index.js";
 
-const HTML_INJECT = '<script src="/studio-actions.js" defer></script>';
+const HTML_INJECT = '<script src="/studio-actions.js" defer></script><script src="/studio-calendar.js" defer></script>';
 
 export default {
   async fetch(request, env, ctx) {
