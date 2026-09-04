@@ -29,3 +29,10 @@
   const observer=new MutationObserver(()=>{if(location.hash.slice(1)==='clients')removeDuplicateTreatmentButtons()});
   observer.observe(document.body,{childList:true,subtree:true});
 })();
+(() => {
+  const targets=['#manualBookingPanel','#completedTreatmentPanel'];
+  const scrollToActionPanel=panel=>{if(!panel||panel.dataset.actionScrolled==='1')return;panel.dataset.actionScrolled='1';requestAnimationFrame(()=>panel.scrollIntoView({behavior:'smooth',block:'start'}))};
+  const observer=new MutationObserver(()=>targets.forEach(selector=>{const panel=document.querySelector(selector);if(panel)scrollToActionPanel(panel)}));
+  observer.observe(document.body,{childList:true,subtree:true});
+  targets.forEach(selector=>{const panel=document.querySelector(selector);if(panel)scrollToActionPanel(panel)});
+})();
