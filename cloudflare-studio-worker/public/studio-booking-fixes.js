@@ -14,6 +14,8 @@
       .cal-event .cal-action:hover{background:white;}
       .cal-event.available .cal-action.remove{color:#8a4036;}
       .cal-event.booked .cal-action.cancel{color:#8a4036;}
+      .studio-calendar{grid-template-rows:auto 840px!important;}
+      .cal-time-column,.cal-day{height:840px!important;}
     `;
     document.head.appendChild(style);
   }
@@ -97,8 +99,6 @@
     }
   }
 
-  // Replace the old table action as well, so the Availability table uses the
-  // same preflight-free mutation path as the calendar.
   window.removeSlot = removeAvailability;
 
   function addCancelButtons() {
