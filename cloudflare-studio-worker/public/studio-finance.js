@@ -12,6 +12,19 @@
     return data;
   }
 
+  async function savePayment(bookingId, payload) {
+    const response = await fetch('/api/studio/bookings/' + encodeURIComponent(bookingId), {
+      method: 'PATCH',
+      credentials: 'include',
+      cache: 'no-store',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || `Could not save changes (${response.status})`);
+    return data;
+  }
+
   function closeModal(modal, button) { modal?.remove(); if (button) button.disabled = false; }
 
   function openAmendModal({ bookingId, client, date, originalPence, adjustmentText, paymentText, button }) {
@@ -68,12 +81,10 @@
       }
       save.disabled = true; cancel.disabled = true; close.disabled = true; message.textContent = 'Saving…';
       try {
-        await request('/api/bookings/' + encodeURIComponent(bookingId), {
-          method: 'PATCH',
-          body: JSON.stringify({ priceAdjustmentPence: adjustmentPence, paymentStatus: payment.value })
-        });
+        await savePayment(bookingId, { priceAdjustmentPence: adjustmentPence, paymentStatus: payment.value });
+        message.textContent = 'Saved';
+        if (typeof window.loadFinance === 'function') await window.loadFinance();
         backdrop.remove(); button.disabled = false;
-        if (typeof window.loadFinance === 'function') window.loadFinance(); else window.location.reload();
       } catch (error) {
         message.textContent = error.message || 'Could not save changes.';
         save.disabled = false; cancel.disabled = false; close.disabled = false;
