@@ -16,7 +16,7 @@ export default {
     const calendarMount = '<section id="studioCalendar" class="studio-calendar-shell" aria-label="Weekly calendar"></section>';
     const withCalendar = html.replace(/<section class="panel"><div class="kicker">Calendar<\/div><h2>Private calendar<\/h2>[\s\S]*?<\/section><\/div>/, `${calendarMount}</div>`);
     const withoutLegacyStyle = withCalendar.replace(/<style>[\s\S]*?<\/style>/i, "");
-    const styles = '<link rel="stylesheet" href="/studio.css?v=20260904g"><link rel="stylesheet" href="/studio-public-match.css?v=20260904a">';
+    const styles = '<link rel="stylesheet" href="/studio.css?v=20260904g"><link rel="stylesheet" href="/studio-public-match.css?v=20260904b">';
     const scripts = '<script src="/studio-actions.js?v=20260904f"></script><script src="/studio-calendar.js?v=20260904f"></script><script src="/studio-booking-fixes.js?v=20260904f"></script>';
     const finalHtml = withoutLegacyStyle.replace(/<\/head>/i, `${styles}</head>`).replace(/<\/body>/i, `${scripts}</body>`);
     const headers = new Headers(response.headers);
