@@ -31,7 +31,7 @@
 })();
 (() => {
   const targets=['#manualBookingPanel','#completedTreatmentPanel'];
-  const scrollToActionPanel=panel=>{if(!panel||panel.dataset.actionScrolled==='1')return;panel.dataset.actionScrolled='1';const offset=panel.id==='completedTreatmentPanel'?225:210;requestAnimationFrame(()=>{setTimeout(()=>{const top=panel.getBoundingClientRect().top+window.scrollY-offset;window.scrollTo({top:Math.max(0,top),behavior:panel.id==='completedTreatmentPanel'?'auto':'smooth'})},300)});};
+  const scrollToActionPanel=panel=>{if(!panel||panel.dataset.actionScrolled==='1')return;panel.dataset.actionScrolled='1';const targetTop=panel.id==='completedTreatmentPanel'?240:210;const applyPosition=()=>{const top=panel.getBoundingClientRect().top+window.scrollY-targetTop;window.scrollTo({top:Math.max(0,top),behavior:'auto'});};requestAnimationFrame(()=>{setTimeout(applyPosition,550);setTimeout(applyPosition,900);});};
   const observer=new MutationObserver(()=>targets.forEach(selector=>{const panel=document.querySelector(selector);if(panel)scrollToActionPanel(panel)}));
   observer.observe(document.body,{childList:true,subtree:true});
   targets.forEach(selector=>{const panel=document.querySelector(selector);if(panel)scrollToActionPanel(panel)});
