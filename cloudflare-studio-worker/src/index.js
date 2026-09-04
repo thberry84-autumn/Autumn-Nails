@@ -56,7 +56,7 @@ export default {
       .replace("if(name==='clients')loadClients()", "if(name==='clients')void 0");
     const footer = `<footer><div class="wrap footer-grid"><div><a class="brand" href="https://autumnnails.com"><strong>Autumn</strong><span>Nails</span></a><div class="small" style="margin-top:10px">A calm little space for beautiful nails.</div><div class="small" style="margin-top:14px">Studio</div></div><div class="footer-links"><a href="https://autumnnails.com">Customer website</a><a href="https://autumnnails.com/services.html">Services &amp; Booking</a><a href="https://autumnnails.com/gallery.html">Gallery</a><a href="https://autumnnails.com/contact.html">Contact</a></div></div></footer>`;
     const styles = '<link rel="stylesheet" href="/studio.css?v=20260904i"><link rel="stylesheet" href="/studio-payment-amend.css?v=20260904b">';
-    const scripts = '<script src="/studio-actions.js?v=20260904f"></script><script src="/studio-calendar.js?v=20260904f"></script><script src="/studio-booking-fixes.js?v=20260904f"></script><script src="/studio-finance.js?v=20260904e"></script><script src="/studio-clients.js?v=20260904b"></script><script>(function(){const clean=()=>document.querySelectorAll("style#studio-polish-css,style:not([id])").forEach(s=>{if(s.id==="studio-polish-css"||s.textContent.includes("#studioCalendar{"))s.remove()});new MutationObserver(clean).observe(document.head,{childList:true});clean()})();</script>';
+    const scripts = '<script src="/studio-actions.js?v=20260904f"></script><script src="/studio-calendar.js?v=20260904f"></script><script src="/studio-booking-fixes.js?v=20260904f"></script><script src="/studio-finance.js?v=20260904e"></script><script src="/studio-clients.js?v=20260904c"></script><script>(function(){const clean=()=>document.querySelectorAll("style#studio-polish-css,style:not([id])").forEach(s=>{if(s.id==="studio-polish-css"||s.textContent.includes("#studioCalendar{"))s.remove()});new MutationObserver(clean).observe(document.head,{childList:true});clean()})();</script>';
     const finalHtml = withoutLegacyFinanceLoad.replace(/<\/head>/i, `${styles}</head>`).replace(/<\/body>/i, `${footer}${scripts}</body>`);
     const headers = new Headers(response.headers); headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
     return new Response(finalHtml, { status: response.status, statusText: response.statusText, headers });
@@ -93,7 +93,8 @@ async function studioUpdateClient(url, request, env) {
 }
 
 async function studioClientHistory(url, env) {
-  const id = decodeURIComponent(url.pathname.split("/")[3] || "");
+  const parts = url.pathname.split("/");
+  const id = decodeURIComponent(parts[4] || "");
   if (!validId(id)) return json({ error: "Invalid client." }, 400);
   const client = await env.DB.prepare("SELECT id,first_name,surname FROM clients WHERE id=? LIMIT 1").bind(id).first();
   if (!client) return json({ error: "Client not found." }, 404);
