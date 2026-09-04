@@ -36,3 +36,13 @@
   observer.observe(document.body,{childList:true,subtree:true});
   targets.forEach(selector=>{const panel=document.querySelector(selector);if(panel)scrollToActionPanel(panel)});
 })();
+(() => {
+  const retryClientsLoad=()=>{
+    if(location.hash.slice(1)!=='clients'||typeof window.loadClients!=='function')return;
+    [150,600,1500].forEach(delay=>setTimeout(()=>{
+      if(location.hash.slice(1)==='clients')window.loadClients();
+    },delay));
+  };
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',retryClientsLoad);else retryClientsLoad();
+  window.addEventListener('hashchange',retryClientsLoad);
+})();
