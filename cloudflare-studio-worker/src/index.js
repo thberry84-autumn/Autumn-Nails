@@ -13,8 +13,10 @@ export default {
     if (!contentType.includes("text/html")) return response;
 
     const html = await response.text();
-    const scripts = '<script src="/studio-actions.js?v=20260904"></script><script>(function(){const b=document.getElementById("bookings");if(b&&b.classList.contains("active")&&location.hash!=="#bookings")history.replaceState(null,"",location.pathname+location.search+"#bookings")})();</script><script src="/studio-calendar.js?v=20260904"></script>';
-    const finalHtml = html.replace(/<\/body>/i, `${scripts}</body>`);
+    const calendarMount = '<section id="studioCalendar" class="studio-calendar-shell" aria-label="Weekly calendar"></section>';
+    const withCalendar = html.replace(/<section class="panel"><div class="kicker">Calendar<\/div><h2>Private calendar<\/h2>[\s\S]*?<\/section><\/div>/, `${calendarMount}</div>`);
+    const scripts = '<script src="/studio-actions.js?v=20260904"></script><script src="/studio-calendar.js?v=20260904"></script>';
+    const finalHtml = withCalendar.replace(/<\/body>/i, `${scripts}</body>`);
     const headers = new Headers(response.headers);
     headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
 
