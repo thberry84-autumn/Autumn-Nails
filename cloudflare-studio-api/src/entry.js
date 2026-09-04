@@ -3,6 +3,7 @@ import { handleStudioAction } from "./studio-actions.js";
 import { handleBookingStatusUpdate } from "./booking-status.js";
 import { handleAvailabilityEdit } from "./availability-edit.js";
 import { handleStudioMutation } from "./studio-mutations.js";
+import { handlePaymentAmend } from "./payment-amend.js";
 
 const STUDIO_ORIGIN = "https://studio.autumnnails.com";
 
@@ -32,6 +33,16 @@ export default {
         console.error("Studio mutation failed", error);
         if (error?.status) return json({ error: error.message }, error.status, origin);
         return json({ error: `Studio mutation failed: ${String(error?.message || error)}` }, 500, origin);
+      }
+    }
+    if (request.method === "PATCH" && url.pathname.startsWith("/api/bookings/") && url.pathname.endsWith("/payment")) {
+      try {
+        const response = await handlePaymentAmend(request, env, ctx, origin, url.pathname);
+        if (response) return response;
+      } catch (error) {
+        if (error?.status) return json({ error: error.message }, error.status, origin);
+        console.error(error);
+        return json({ error: "Could not save the payment amendment. Please try again." }, 500, origin);
       }
     }
     if (request.method === "PATCH" && url.pathname.startsWith("/api/bookings/")) {
