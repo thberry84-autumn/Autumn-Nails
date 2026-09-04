@@ -4,23 +4,26 @@
   const pad=n=>String(n).padStart(2,'0');
   const dateKey=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
   const parseDate=s=>{const [y,m,d]=String(s||'').split('-').map(Number);return y?new Date(y,m-1,d):null};
-  const startOfWeek=d=>{const x=new Date(d);x.setHours(0,0,0,0);x.setDate(x.getDate()-((x.getDay()+6)%7));return x};
   const addDays=(d,n)=>{const x=new Date(d);x.setDate(x.getDate()+n);return x};
   const esc=v=>String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;').replace(/'/g,'&#39;');
   const money=p=>'£'+(Number(p||0)/100).toFixed(2);
   const fmtTime=t=>String(t||'').slice(0,5);
+  const fmtSlotDate=iso=>{const [y,m,d]=String(iso||'').split('-');return y&&m&&d?`${d}/${m}/${String(y).slice(-2)}`:''};
+  const readSlotDate=value=>{const v=String(value||'').trim();if(/^\d{4}-\d{2}-\d{2}$/.test(v))return v;const match=v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/);if(!match)return '';let [,d,m,y]=match;if(y.length===2)y=`20${y}`;return `${y}-${pad(Number(m))}-${pad(Number(d))}`};
+  const setSlotDate=iso=>{const el=document.getElementById('slotDate');if(!el)return;el.type='text';el.inputMode='numeric';el.placeholder='DD/MM/YY';el.value=fmtSlotDate(iso)};
+  const scrollToSlot=()=>{const target=document.getElementById('addSlot');if(!target)return;const top=target.getBoundingClientRect().top+window.scrollY-220;window.scrollTo({top:Math.max(0,top),behavior:'smooth'})};
   async function api(path){const r=await fetch(API+path,{credentials:'include',cache:'no-store'});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||'Could not load calendar');return d}
-  const state={week:startOfWeek(new Date()),selected:new Date(),availability:[],bookings:[]};
+  const state={week:(()=>{const x=new Date();x.setHours(0,0,0,0);x.setDate(x.getDate()-((x.getDay()+6)%7));return x})(),selected:new Date(),availability:[],bookings:[]};
   function bookingName(b){return `${b.first_name||''} ${b.surname||''}`.trim()||'Booked'}
   function services(b){return (b.selectedServices||[]).map(x=>String(x).replaceAll('-',' ')).join(', ')||b.service_id||'Appointment'}
   function mins(t){const [h,m]=String(t||'00:00').split(':').map(Number);return h*60+m}
   function eventClass(status){return status==='cancelled'?' cancelled':status==='completed'?' completed':''}
   async function releaseAvailability(){
     const msg=document.getElementById('slotMsg');
-    const date=document.getElementById('slotDate')?.value||'';
+    const date=readSlotDate(document.getElementById('slotDate')?.value);
     const startTime=document.getElementById('slotTime')?.value||'';
     const services=[...(document.getElementById('slotServices')?.selectedOptions||[])].map(o=>o.value);
-    if(!date||!startTime){if(msg)msg.textContent='Please choose a date and time.';return}
+    if(!date||!startTime){if(msg)msg.textContent='Please enter a valid date and time.';return}
     if(msg)msg.textContent='Releasing…';
     try{
       const body=new URLSearchParams({date,startTime,serviceIds:JSON.stringify(services)});
@@ -41,13 +44,14 @@
     section.querySelector('[data-cal-prev]').onclick=()=>{state.week=addDays(state.week,-7);render()};
     section.querySelector('[data-cal-next]').onclick=()=>{state.week=addDays(state.week,7);render()};
     section.querySelector('[data-cal-today]').onclick=()=>{state.week=startOfWeek(new Date());state.selected=new Date();render()};
-    section.querySelector('[data-cal-add]').onclick=()=>{state.selected=new Date();const date=document.getElementById('slotDate');if(date)date.value=dateKey(state.selected);const target=document.getElementById('addSlot');if(target)target.scrollIntoView({behavior:'smooth',block:'center'})};
+    section.querySelector('[data-cal-add]').onclick=()=>{state.selected=new Date();setSlotDate(dateKey(state.selected));scrollToSlot()};
     const add=document.getElementById('addSlot');
     if(add&&!add.dataset.calendarAvailabilityBound){add.dataset.calendarAvailabilityBound='1';add.onclick=releaseAvailability}
     const date=document.getElementById('slotDate');
-    if(date&&!date.value)date.value=dateKey(new Date());
+    if(date){const current=readSlotDate(date.value)||dateKey(new Date());date.type='text';date.inputMode='numeric';date.placeholder='DD/MM/YY';date.value=fmtSlotDate(current)}
     return true;
   }
+  function startOfWeek(d){const x=new Date(d);x.setHours(0,0,0,0);x.setDate(x.getDate()-((x.getDay()+6)%7));return x}
   function render(){
     const grid=document.querySelector('[data-cal-grid]');const summary=document.querySelector('[data-cal-summary]');if(!grid)return;
     const days=Array.from({length:7},(_,i)=>addDays(state.week,i));const from=dateKey(days[0]),to=dateKey(days[6]);
@@ -58,7 +62,7 @@
     grid.innerHTML=`<div class="cal-time-head">${days[0].toLocaleDateString('en-GB',{month:'long'})}</div>${days.map(d=>`<div class="cal-day-head ${dateKey(d)===dateKey(new Date())?'today':''}"><strong>${d.toLocaleDateString('en-GB',{weekday:'short'})}</strong><span>${d.toLocaleDateString('en-GB',{day:'numeric',month:'short'})}</span></div>`).join('')}<div class="cal-time-column">${Array.from({length:17},(_,i)=>`<div>${pad(6+i)}:00</div>`).join('')}</div>${days.map(d=>dayColumn(d,all)).join('')}`;
     grid.querySelectorAll('[data-booking-id]').forEach(el=>el.onclick=()=>{const id=el.dataset.bookingId;const btn=document.querySelector(`[data-edit-booking="${CSS.escape(id)}"]`);if(btn)btn.click();else alert('Open the booking below to edit it.')});
     grid.querySelectorAll('[data-available-id]').forEach(el=>el.onclick=()=>{const row=document.querySelector(`[data-edit-availability="${CSS.escape(el.dataset.availableId)}"]`);if(row)row.click();else alert('This released space can still be managed in Availability below.')});
-    grid.querySelectorAll('[data-empty-date]').forEach(el=>el.onclick=()=>{state.selected=parseDate(el.dataset.emptyDate);const date=document.getElementById('slotDate');if(date)date.value=el.dataset.emptyDate;const add=document.getElementById('addSlot');if(add)add.scrollIntoView({behavior:'smooth',block:'center'})});
+    grid.querySelectorAll('[data-empty-date]').forEach(el=>el.onclick=()=>{state.selected=parseDate(el.dataset.emptyDate);setSlotDate(el.dataset.emptyDate);scrollToSlot()});
   }
   function dayColumn(d,all){const key=dateKey(d);const items=all.filter(x=>x.date===key).sort((a,b)=>mins(a.start_time)-mins(b.start_time));return `<div class="cal-day ${key===dateKey(new Date())?'today':''}">${Array.from({length:17},(_,i)=>`<div class="cal-hour" data-empty-date="${key}" style="top:${i*60}px"></div>`).join('')}${items.map(x=>{const top=Math.max(0,(mins(x.start_time)-360)/60);if(x._type==='booked')return `<button type="button" class="cal-event booked${eventClass(x.status)}" data-booking-id="${esc(x.id)}" style="top:${top}px"><b>${esc(fmtTime(x.start_time))}</b><strong>${esc(bookingName(x))}</strong><span>${esc(services(x))}</span><small>${esc(x.status||'confirmed')} · ${money(x.finalPricePence??x.price_pence)}</small></button>`;return `<button type="button" class="cal-event available" data-available-id="${esc(x.id)}" style="top:${top}px"><b>${esc(fmtTime(x.start_time))}</b><strong>Available</strong><span>${esc((x.services||x.service_ids||[]).join(', ').replaceAll('-',' '))}</span></button>`}).join('')}</div>`}
   async function load(){try{const [a,b]=await Promise.all([api('/api/availability'),api('/api/bookings')]);state.availability=a.slots||[];state.bookings=b.bookings||[];render()}catch(e){const g=document.querySelector('[data-cal-grid]');if(g)g.innerHTML=`<div class="cal-error">${esc(e.message)}</div>`}}
