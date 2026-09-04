@@ -68,7 +68,10 @@
       }
       save.disabled = true; cancel.disabled = true; close.disabled = true; message.textContent = 'Saving…';
       try {
-        await request('/api/bookings/' + encodeURIComponent(bookingId) + '/payment', { method: 'PATCH', body: JSON.stringify({ priceAdjustmentPence: adjustmentPence, paymentStatus: payment.value }) });
+        await request('/api/bookings/' + encodeURIComponent(bookingId), {
+          method: 'PATCH',
+          body: JSON.stringify({ priceAdjustmentPence: adjustmentPence, paymentStatus: payment.value })
+        });
         backdrop.remove(); button.disabled = false;
         if (typeof window.loadFinance === 'function') window.loadFinance(); else window.location.reload();
       } catch (error) {
