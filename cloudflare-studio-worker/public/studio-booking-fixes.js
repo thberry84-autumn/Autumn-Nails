@@ -1,22 +1,42 @@
 (() => {
   const API = 'https://studio-booking-api.autumnnails.com';
-  const pad = n => String(n).padStart(2, '0');
+  const MIN_TIME = '18:00';
+  const MAX_TIME = '22:00';
 
   function patchTimePickers() {
     document.querySelectorAll('input[type="time"]').forEach(input => {
-      input.min = '18:00';
-      input.max = '22:00';
+      input.min = MIN_TIME;
+      input.max = MAX_TIME;
+      if (!input.value || input.value < MIN_TIME || input.value > MAX_TIME) input.value = MIN_TIME;
+
       const wrap = input.closest('.time-picker-wrap');
       if (!wrap) return;
+
       wrap.querySelectorAll('.time-choice').forEach(button => {
-        const value = button.dataset.time || '';
-        button.hidden = value < '18:00' || value > '22:00';
+        const value = String(button.dataset.time || '').slice(0, 5);
+        button.hidden = !/^\d{2}:\d{2}$/.test(value) || value < MIN_TIME || value > MAX_TIME;
       });
+
       const picker = wrap.querySelector('.time-picker-popover');
-      if (picker && !picker.querySelector('.time-choice:not([hidden])')) {
-        picker.hidden = true;
+      if (picker) {
+        const visible = picker.querySelectorAll('.time-choice:not([hidden])');
+        if (!visible.length) picker.hidden = true;
+      }
+
+      const button = wrap.querySelector('.time-picker-button');
+      if (button && (!button.textContent || button.textContent === 'Choose time' || button.textContent < MIN_TIME || button.textContent > MAX_TIME)) {
+        button.textContent = input.value || MIN_TIME;
       }
     });
+  }
+
+  function getBookingId(row) {
+    const edit = row.querySelector('[data-edit-booking]');
+    if (edit?.dataset.editBooking) return edit.dataset.editBooking;
+    const select = row.querySelector('select[onchange*="changeBooking"]');
+    const source = String(select?.getAttribute('onchange') || '');
+    const match = source.match(/changeBooking\(['\"]([^'\"]+)['\"]/);
+    return match ? match[1] : '';
   }
 
   async function cancelBooking(id) {
@@ -30,7 +50,9 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'cancelled' })
       });
-      const data = await response.json().catch(() => ({}));
+      const text = await response.text();
+      let data = {};
+      try { data = text ? JSON.parse(text) : {}; } catch {}
       if (!response.ok) throw new Error(data.error || `Could not cancel appointment (${response.status})`);
       if (typeof window.loadBookings === 'function') await window.loadBookings();
       else location.hash = '#bookings';
@@ -42,19 +64,19 @@
   function addCancelButtons() {
     document.querySelectorAll('#bookingTable tbody tr').forEach(row => {
       if (row.dataset.cancelFix === '1') return;
+      const id = getBookingId(row);
+      if (!id) return;
+
       const select = row.querySelector('select[onchange*="changeBooking"]');
-      if (!select) return;
-      const match = String(select.getAttribute('onchange') || '').match(/changeBooking\(['\"]([^'\"]+)/);
-      if (!match) return;
-      const id = match[1];
-      const cell = select.parentElement;
+      const cell = select?.parentElement || row.lastElementChild;
       if (!cell) return;
+
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'button secondary';
       button.textContent = 'Cancel';
       button.style.marginLeft = '7px';
-      button.onclick = () => cancelBooking(id);
+      button.addEventListener('click', () => cancelBooking(id));
       cell.appendChild(button);
       row.dataset.cancelFix = '1';
     });
