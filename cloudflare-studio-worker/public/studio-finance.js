@@ -19,29 +19,33 @@
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',loadGalleryControls);else loadGalleryControls();window.addEventListener('hashchange',loadGalleryControls);
 })();
 (() => {
-  const removeDuplicateTreatmentButtons=()=>{
-    if(location.hash.slice(1)!=='clients')return;
-    const buttons=[...document.querySelectorAll('#recordTreatment')];
-    buttons.slice(1).forEach(button=>button.remove());
-  };
+  const removeDuplicateTreatmentButtons=()=>{if(location.hash.slice(1)!=='clients')return;const buttons=[...document.querySelectorAll('#recordTreatment')];buttons.slice(1).forEach(button=>button.remove())};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',removeDuplicateTreatmentButtons);else removeDuplicateTreatmentButtons();
   window.addEventListener('hashchange',()=>{if(location.hash.slice(1)==='clients'){removeDuplicateTreatmentButtons();setTimeout(removeDuplicateTreatmentButtons,100);setTimeout(removeDuplicateTreatmentButtons,500)}});
-  const observer=new MutationObserver(()=>{if(location.hash.slice(1)==='clients')removeDuplicateTreatmentButtons()});
-  observer.observe(document.body,{childList:true,subtree:true});
+  const observer=new MutationObserver(()=>{if(location.hash.slice(1)==='clients')removeDuplicateTreatmentButtons()});observer.observe(document.body,{childList:true,subtree:true});
 })();
 (() => {
   const targets=['#manualBookingPanel','#completedTreatmentPanel'];
-  const scrollToActionPanel=panel=>{if(!panel||panel.dataset.actionScrolled==='1')return;panel.dataset.actionScrolled='1';const targetTop=panel.id==='completedTreatmentPanel'?240:210;const applyPosition=()=>{const top=panel.getBoundingClientRect().top+window.scrollY-targetTop;window.scrollTo({top:Math.max(0,top),behavior:'auto'});};requestAnimationFrame(()=>{setTimeout(applyPosition,550);setTimeout(applyPosition,900);});};
-  const observer=new MutationObserver(()=>targets.forEach(selector=>{const panel=document.querySelector(selector);if(panel)scrollToActionPanel(panel)}));
-  observer.observe(document.body,{childList:true,subtree:true});
-  targets.forEach(selector=>{const panel=document.querySelector(selector);if(panel)scrollToActionPanel(panel)});
+  const scrollToActionPanel=panel=>{if(!panel||panel.dataset.actionScrolled==='1')return;panel.dataset.actionScrolled='1';const offset=panel.id==='completedTreatmentPanel'?225:210;requestAnimationFrame(()=>{setTimeout(()=>{const top=panel.getBoundingClientRect().top+window.scrollY-offset;window.scrollTo({top:Math.max(0,top),behavior:'smooth'})},40)})};
+  const observer=new MutationObserver(()=>targets.forEach(selector=>{const panel=document.querySelector(selector);if(panel)scrollToActionPanel(panel)}));observer.observe(document.body,{childList:true,subtree:true});targets.forEach(selector=>{const panel=document.querySelector(selector);if(panel)scrollToActionPanel(panel)});
 })();
 (() => {
-  const retryClientsLoad=()=>{
-    if(location.hash.slice(1)!=='clients'||typeof window.studioClientsReload!=='function')return;
-    [150,600,1500].forEach(delay=>setTimeout(()=>{if(location.hash.slice(1)==='clients')window.studioClientsReload()},delay));
-  };
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',retryClientsLoad);else retryClientsLoad();
-  window.addEventListener('hashchange',retryClientsLoad);
+  const retryClientsLoad=()=>{if(location.hash.slice(1)!=='clients'||typeof window.studioClientsReload!=='function')return;[150,600,1500].forEach(delay=>setTimeout(()=>{if(location.hash.slice(1)==='clients')window.studioClientsReload()},delay))};
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',retryClientsLoad);else retryClientsLoad();window.addEventListener('hashchange',retryClientsLoad);
 })();
+(() => {
+  const positionRecordTreatment=()=>{
+    if(location.hash.slice(1)!=='clients')return;
+    const panel=document.getElementById('completedTreatmentPanel');
+    if(!panel)return;
+    const targetY=240;
+    const documentY=panel.getBoundingClientRect().top+window.scrollY;
+    const targetScroll=Math.max(0,documentY-targetY);
+    window.scrollTo({top:targetScroll,behavior:'auto'});
+  };
+  document.addEventListener('click',event=>{
+    if(location.hash.slice(1)!=='clients')return;
+    if(!event.target.closest('#recordTreatment'))return;
+    [150,450,900,1400].forEach(delay=>setTimeout(positionRecordTreatment,delay));
+  },true);
 })();
