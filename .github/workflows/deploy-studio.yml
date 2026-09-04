@@ -6,6 +6,9 @@ on:
 permissions:
   contents: read
 
+env:
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
 jobs:
   deploy-studio-worker:
     runs-on: ubuntu-latest
@@ -13,14 +16,27 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Install Wrangler
+        working-directory: cloudflare-studio-worker
+        run: npm install --no-save wrangler@4.127.1
+
+      - name: Check Studio Worker JavaScript syntax
+        working-directory: cloudflare-studio-worker
+        run: node --check src/entry.js
 
       - name: Deploy Studio Worker
-        uses: cloudflare/wrangler-action@v4
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: cloudflare-studio-worker
-          command: deploy
+        working-directory: cloudflare-studio-worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npx wrangler@4.127.1 deploy
 
   deploy-studio-api:
     runs-on: ubuntu-latest
@@ -28,22 +44,36 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Install Wrangler
+        working-directory: cloudflare-studio-api
+        run: npm install --no-save wrangler@4.127.1
+
+      - name: Check Studio API JavaScript syntax
+        working-directory: cloudflare-studio-api
+        run: node --check src/entry.js
 
       - name: Deploy Studio API
-        uses: cloudflare/wrangler-action@v4
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: cloudflare-studio-api
-          command: deploy
+        working-directory: cloudflare-studio-api
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npx wrangler@4.127.1 deploy
 
       - name: Set Studio API GitHub secret
         working-directory: cloudflare-studio-api
         env:
           STUDIO_GITHUB_TOKEN: ${{ secrets.STUDIO_GITHUB_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
           if [ -z "$STUDIO_GITHUB_TOKEN" ]; then
-            echo "STUDIO_GITHUB_TOKEN is not configured; leaving the Worker deployed but without its GitHub captions secret."
-            exit 0
+            echo "STUDIO_GITHUB_TOKEN is not configured."
+            exit 1
           fi
-          printf '%s' "$STUDIO_GITHUB_TOKEN" | npx wrangler secret put GITHUB_TOKEN
+          printf '%s' "$STUDIO_GITHUB_TOKEN" | npx wrangler@4.127.1 secret put GITHUB_TOKEN
