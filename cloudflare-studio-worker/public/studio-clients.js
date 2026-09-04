@@ -24,7 +24,7 @@
   function scrollToPanel(panel) {
     if (!panel) return;
     requestAnimationFrame(() => setTimeout(() => {
-      const top = panel.getBoundingClientRect().top + window.scrollY - 24;
+      const top = panel.getBoundingClientRect().top + window.scrollY - 8;
       window.scrollTo({ top: Math.max(0, top), behavior:'smooth' });
     }, 40));
   }
@@ -105,11 +105,10 @@
     if (add) add.onclick = () => openEditor();
     if (saveButton) saveButton.onclick = save;
     if (close) close.onclick = () => $('clientEdit').classList.add('hidden');
-    document.addEventListener('click', event => {
+    table.addEventListener('click', event => {
       const edit = event.target.closest('[data-client-edit]');
       if (edit) {
         event.preventDefault();
-        event.stopImmediatePropagation();
         const client = clients.find(c => c.id === edit.dataset.clientEdit);
         if (client) openEditor(client);
         return;
@@ -117,12 +116,12 @@
       const hist = event.target.closest('[data-client-history]');
       if (hist) {
         event.preventDefault();
-        event.stopImmediatePropagation();
         history(hist.dataset.clientHistory);
       }
-    }, true);
+    });
   }
 
+  window.editClient = id => { const client = clients.find(c => c.id === id); if (client) openEditor(client); };
   window.showHistory = history;
   window.studioClientsReload = load;
   const init = () => { if (location.hash.slice(1) === 'clients') { bind(); load(); } };
