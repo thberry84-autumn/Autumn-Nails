@@ -23,7 +23,10 @@
 
   function scrollToPanel(panel) {
     if (!panel) return;
-    requestAnimationFrame(() => requestAnimationFrame(() => panel.scrollIntoView({behavior:'smooth', block:'start'})));
+    requestAnimationFrame(() => setTimeout(() => {
+      const top = panel.getBoundingClientRect().top + window.scrollY - 24;
+      window.scrollTo({ top: Math.max(0, top), behavior:'smooth' });
+    }, 40));
   }
 
   function render() {
