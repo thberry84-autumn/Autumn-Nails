@@ -15,6 +15,23 @@
   function services(b){return (b.selectedServices||[]).map(x=>String(x).replaceAll('-',' ')).join(', ')||b.service_id||'Appointment'}
   function mins(t){const [h,m]=String(t||'00:00').split(':').map(Number);return h*60+m}
   function eventClass(status){return status==='cancelled'?' cancelled':status==='completed'?' completed':''}
+  async function releaseAvailability(){
+    const msg=document.getElementById('slotMsg');
+    const date=document.getElementById('slotDate')?.value||'';
+    const startTime=document.getElementById('slotTime')?.value||'';
+    const services=[...(document.getElementById('slotServices')?.selectedOptions||[])].map(o=>o.value);
+    if(!date||!startTime){if(msg)msg.textContent='Please choose a date and time.';return}
+    if(msg)msg.textContent='Releasing…';
+    try{
+      const body=new URLSearchParams({date,startTime,serviceIds:JSON.stringify(services)});
+      const r=await fetch(API+'/api/availability',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body,credentials:'include',cache:'no-store'});
+      const d=await r.json().catch(()=>({}));
+      if(!r.ok)throw Error(d.error||'Could not release this appointment space.');
+      if(msg)msg.textContent='Slot released.';
+      await load();
+      if(typeof window.loadBookings==='function'){try{await window.loadBookings()}catch{}}
+    }catch(e){if(msg)msg.textContent=e.message||'Could not release this appointment space.'}
+  }
   function install(){
     const bookings=document.querySelector('#bookings');
     if(!bookings)return false;
@@ -23,8 +40,12 @@
     if(!section.querySelector('[data-cal-grid]'))section.innerHTML=`<div class="studio-calendar-head"><div><div class="kicker">Your diary</div><h2>Weekly calendar</h2><p class="muted">Booked appointments and released spaces, together.</p></div><div class="studio-calendar-controls"><button class="button secondary" data-cal-prev>‹ Previous</button><button class="button secondary" data-cal-today>Today</button><button class="button secondary" data-cal-next>Next ›</button><button class="button" data-cal-add>+ Release availability</button></div></div><div class="studio-calendar-summary" data-cal-summary></div><div class="studio-calendar-wrap"><div class="studio-calendar" data-cal-grid></div></div><div class="studio-calendar-key"><span><i class="cal-dot available"></i> Available</span><span><i class="cal-dot booked"></i> Booked</span><span><i class="cal-dot empty"></i> Empty</span></div>`;
     section.querySelector('[data-cal-prev]').onclick=()=>{state.week=addDays(state.week,-7);render()};
     section.querySelector('[data-cal-next]').onclick=()=>{state.week=addDays(state.week,7);render()};
-    section.querySelector('[data-cal-today]').onclick=()=>{state.week=startOfWeek(new Date());render()};
-    section.querySelector('[data-cal-add]').onclick=()=>{const date=document.getElementById('slotDate');if(date)date.value=dateKey(state.selected||new Date());const target=document.getElementById('addSlot');if(target)target.scrollIntoView({behavior:'smooth',block:'center'})};
+    section.querySelector('[data-cal-today]').onclick=()=>{state.week=startOfWeek(new Date());state.selected=new Date();render()};
+    section.querySelector('[data-cal-add]').onclick=()=>{state.selected=new Date();const date=document.getElementById('slotDate');if(date)date.value=dateKey(state.selected);const target=document.getElementById('addSlot');if(target)target.scrollIntoView({behavior:'smooth',block:'center'})};
+    const add=document.getElementById('addSlot');
+    if(add&&!add.dataset.calendarAvailabilityBound){add.dataset.calendarAvailabilityBound='1';add.onclick=releaseAvailability}
+    const date=document.getElementById('slotDate');
+    if(date&&!date.value)date.value=dateKey(new Date());
     return true;
   }
   function render(){
