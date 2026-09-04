@@ -31,7 +31,7 @@
 })();
 (() => {
   const targets=['#manualBookingPanel','#completedTreatmentPanel'];
-  const scrollToActionPanel=panel=>{if(!panel||panel.dataset.actionScrolled==='1')return;panel.dataset.actionScrolled='1';requestAnimationFrame(()=>panel.scrollIntoView({behavior:'smooth',block:'start'}))};
+  const scrollToActionPanel=panel=>{if(!panel||panel.dataset.actionScrolled==='1')return;panel.dataset.actionScrolled='1';requestAnimationFrame(()=>{setTimeout(()=>{const top=panel.getBoundingClientRect().top+window.scrollY-8;window.scrollTo({top:Math.max(0,top),behavior:'smooth'})},40)});};
   const observer=new MutationObserver(()=>targets.forEach(selector=>{const panel=document.querySelector(selector);if(panel)scrollToActionPanel(panel)}));
   observer.observe(document.body,{childList:true,subtree:true});
   targets.forEach(selector=>{const panel=document.querySelector(selector);if(panel)scrollToActionPanel(panel)});
@@ -43,4 +43,5 @@
   };
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',retryClientsLoad);else retryClientsLoad();
   window.addEventListener('hashchange',retryClientsLoad);
+})();
 })();
