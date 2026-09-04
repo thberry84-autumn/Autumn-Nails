@@ -12,6 +12,41 @@
     return data;
   }
 
+  async function sameOriginFinance() {
+    const response = await fetch('/api/studio/finance', { credentials: 'include', cache: 'no-store' });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || `Finance could not load (${response.status})`);
+    return data;
+  }
+
+  function renderFinance(data) {
+    const t = data.totals || {};
+    const stats = document.getElementById('financeStats');
+    const host = document.getElementById('financeTable');
+    if (!stats || !host) return;
+    stats.innerHTML = `<div class="stat"><small>Total booked</small><strong>${money(t.booked)}</strong></div><div class="stat"><small>Paid</small><strong>${money(t.paid)}</strong></div><div class="stat"><small>Unpaid</small><strong>${money(t.unpaid)}</strong></div>`;
+    const rows = data.rows || [];
+    host.innerHTML = rows.length
+      ? '<div class="table-wrap"><table><thead><tr><th>Date</th><th>Client</th><th>Original</th><th>Adjustment</th><th>Final</th><th>Payment</th></tr></thead><tbody>' + rows.map(r => `<tr><td>${escapeHtml(r.date)}</td><td>${escapeHtml(r.first_name+' '+r.surname)}</td><td>${money(r.price_pence)}</td><td>${money(r.price_adjustment_pence)}</td><td>${money(r.final_price_pence??r.price_pence)}</td><td>${escapeHtml(r.payment_status||'unpaid')}</td></tr>`).join('') + '</tbody></table></div>'
+      : '<div class="empty">No payment records.</div>';
+  }
+
+  async function loadFinanceSameOrigin() {
+    try {
+      const data = await sameOriginFinance();
+      renderFinance(data);
+      await enhanceFinance(data);
+    } catch (error) {
+      const host = document.getElementById('financeTable');
+      if (host) host.innerHTML = '<div class="error">' + escapeHtml(error.message || 'Finance could not load.') + '</div>';
+      console.error('Studio finance load failed', error);
+    }
+  }
+
+  // Replace the legacy cross-origin finance loader with the same-origin one.
+  // This also fixes the first visit to #finance, which runs before this script.
+  window.loadFinance = loadFinanceSameOrigin;
+
   async function savePayment(bookingId, payload) {
     const response = await fetch('/api/studio/bookings/' + encodeURIComponent(bookingId), {
       method: 'PATCH',
@@ -83,7 +118,7 @@
       try {
         await savePayment(bookingId, { priceAdjustmentPence: adjustmentPence, paymentStatus: payment.value });
         message.textContent = 'Saved';
-        if (typeof window.loadFinance === 'function') await window.loadFinance();
+        await loadFinanceSameOrigin();
         backdrop.remove(); button.disabled = false;
       } catch (error) {
         message.textContent = error.message || 'Could not save changes.';
@@ -93,12 +128,11 @@
     selectAmount();
   }
 
-  async function enhanceFinance() {
+  async function enhanceFinance(data) {
     const host = document.getElementById('financeTable');
     const table = host?.querySelector('table');
     if (!table || table.dataset.amendReady === '1') return;
-    const finance = await request('/api/finance').catch(error => { console.warn('Studio finance amendments could not load booking IDs', error); return null; });
-    const rows = finance?.rows || [];
+    const rows = data?.rows || [];
     const header = table.querySelector('thead tr');
     if (!header) return;
     if (![...header.children].some(cell => cell.textContent.trim() === 'Actions')) { const th = document.createElement('th'); th.textContent = 'Actions'; header.appendChild(th); }
@@ -116,7 +150,8 @@
     });
     table.dataset.amendReady = '1';
   }
-  const observer = new MutationObserver(() => enhanceFinance());
-  observer.observe(document.body, { childList: true, subtree: true });
-  enhanceFinance();
+
+  // The legacy loader may already have run on the first page load. Replace its
+  // output immediately if Payments is the current view.
+  if (location.hash.slice(1) === 'finance') loadFinanceSameOrigin();
 })();
