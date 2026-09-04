@@ -48,4 +48,22 @@
   obs.observe(document.body,{childList:true,subtree:true});
   window.addEventListener('hashchange',()=>{if(location.hash==='#bookings')setTimeout(renderWhenReady,20)});
   if(location.hash==='#bookings'||document.querySelector('#bookings.active'))setTimeout(renderWhenReady,20);
+  const arrangeBookings=()=>{
+    const bookings=document.querySelector('#bookings');
+    if(!bookings||!document.getElementById(rootId))return;
+    const hero=bookings.querySelector('.hero');
+    const calendar=document.getElementById(rootId);
+    const grid=hero?.nextElementSibling===calendar?calendar.nextElementSibling:bookings.querySelector('.grid');
+    const availability=bookings.querySelector('#availability')?.closest('.panel');
+    const bookingTable=bookings.querySelector('#bookingTable')?.closest('.panel');
+    const manual=bookings.querySelector('#manualBookingPanel');
+    if(calendar&&hero&&hero.nextElementSibling!==calendar)hero.insertAdjacentElement('afterend',calendar);
+    if(grid&&calendar&&calendar.nextElementSibling!==grid)calendar.insertAdjacentElement('afterend',grid);
+    if(availability&&grid&&availability.previousElementSibling!==grid)grid.insertAdjacentElement('afterend',availability);
+    if(bookingTable&&availability&&availability.nextElementSibling!==bookingTable)availability.insertAdjacentElement('afterend',bookingTable);
+    if(manual&&bookingTable&&manual.previousElementSibling!==bookingTable)bookingTable.insertAdjacentElement('afterend',manual);
+  };
+  const layoutObserver=new MutationObserver(()=>{if(location.hash==='#bookings'||document.querySelector('#bookings.active'))arrangeBookings()});
+  layoutObserver.observe(document.body,{childList:true,subtree:true});
+  setTimeout(arrangeBookings,80);
 })();
