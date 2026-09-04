@@ -28,6 +28,28 @@ export default {
         } else {
           body = await request.json();
         }
+
+        // A cancelled booking keeps its original slot for history. Releasing
+        // that same date/time should reuse the slot rather than attempting to
+        // create a duplicate record.
+        const date = String(body.date || "").trim();
+        const startTime = String(body.startTime || "").trim();
+        if (date && startTime) {
+          await requireAccess(ctx);
+          const existing = await env.DB.prepare("SELECT id,status,removed_at FROM availability_slots WHERE date=? AND start_time=? LIMIT 1").bind(date,startTime).first();
+          if (existing) {
+            if (existing.status === "booked") return json({ error: "That appointment space is currently booked." }, 409, origin);
+            const serviceIds = Array.isArray(body.serviceIds) ? [...new Set(body.serviceIds.map(String))] : [];
+            const now = new Date().toISOString();
+            if (existing.removed_at) {
+              await env.DB.prepare("UPDATE availability_slots SET service_ids_json=?,status='available',removed_at=NULL,updated_at=? WHERE id=?").bind(JSON.stringify(serviceIds),now,existing.id).run();
+              return json({ ok: true, id: existing.id, restored: true }, 200, origin);
+            }
+            await env.DB.prepare("UPDATE availability_slots SET service_ids_json=?,status='available',updated_at=? WHERE id=?").bind(JSON.stringify(serviceIds),now,existing.id).run();
+            return json({ ok: true, id: existing.id, alreadyAvailable: true }, 200, origin);
+          }
+        }
+
         const headers = new Headers(request.headers);
         headers.set("Content-Type", "application/json");
         const translated = new Request(request, { method: "POST", headers, body: JSON.stringify(body) });
