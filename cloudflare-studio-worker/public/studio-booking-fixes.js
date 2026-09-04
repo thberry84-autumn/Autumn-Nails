@@ -52,6 +52,48 @@
     });
   }
 
+  function patchCalendarTimes() {
+    const root = document.getElementById('studioCalendar');
+    if (!root) return;
+    const hours = 14;
+    const height = hours * 60;
+    const startMinutes = 9 * 60;
+
+    const timeColumn = root.querySelector('.cal-time-column');
+    if (timeColumn) {
+      [...timeColumn.children].slice(0, hours).forEach((el, i) => {
+        const text = `${String(9 + i).padStart(2, '0')}:00`;
+        if (el.textContent !== text) el.textContent = text;
+        if (el.style.display) el.style.display = '';
+      });
+      [...timeColumn.children].slice(hours).forEach(el => {
+        if (el.style.display !== 'none') el.style.display = 'none';
+      });
+      if (timeColumn.style.height !== `${height}px`) timeColumn.style.height = `${height}px`;
+    }
+
+    root.querySelectorAll('.cal-day').forEach(day => {
+      if (day.style.height !== `${height}px`) day.style.height = `${height}px`;
+      day.querySelectorAll('.cal-hour').forEach((el, i) => {
+        if (i < hours) {
+          if (el.style.display) el.style.display = '';
+          if (el.style.top !== `${i * 60}px`) el.style.top = `${i * 60}px`;
+        } else if (el.style.display !== 'none') {
+          el.style.display = 'none';
+        }
+      });
+
+      day.querySelectorAll('.cal-event').forEach(eventEl => {
+        const timeText = eventEl.querySelector('b')?.textContent || '';
+        const match = timeText.match(/(\d{1,2}):(\d{2})/);
+        if (!match) return;
+        const minutes = Number(match[1]) * 60 + Number(match[2]);
+        const top = Math.max(0, Math.min(height - 1, minutes - startMinutes));
+        if (eventEl.style.top !== `${top}px`) eventEl.style.setProperty('top', `${top}px`, 'important');
+      });
+    });
+  }
+
   function getBookingId(row) {
     const edit = row.querySelector('[data-edit-booking]');
     if (edit?.dataset.editBooking) return edit.dataset.editBooking;
@@ -65,38 +107,26 @@
     if (!id) return;
     if (!window.confirm('Cancel this appointment? The released space will become available again.')) return;
     try {
-      const response = await fetch(`${API}/api/bookings/${encodeURIComponent(id)}/cancel`, {
-        method: 'POST',
-        credentials: 'include',
-        cache: 'no-store'
-      });
+      const response = await fetch(`${API}/api/bookings/${encodeURIComponent(id)}/cancel`, { method: 'POST', credentials: 'include', cache: 'no-store' });
       const text = await response.text();
       let data = {};
       try { data = text ? JSON.parse(text) : {}; } catch {}
       if (!response.ok) throw new Error(data.error || `Could not cancel appointment (${response.status})`);
       location.reload();
-    } catch (error) {
-      window.alert(error?.message || 'Could not cancel appointment.');
-    }
+    } catch (error) { window.alert(error?.message || 'Could not cancel appointment.'); }
   }
 
   async function removeAvailability(id) {
     if (!id) return;
     if (!window.confirm('Remove this appointment space? It will no longer be bookable.')) return;
     try {
-      const response = await fetch(`${API}/api/availability/${encodeURIComponent(id)}/remove`, {
-        method: 'POST',
-        credentials: 'include',
-        cache: 'no-store'
-      });
+      const response = await fetch(`${API}/api/availability/${encodeURIComponent(id)}/remove`, { method: 'POST', credentials: 'include', cache: 'no-store' });
       const text = await response.text();
       let data = {};
       try { data = text ? JSON.parse(text) : {}; } catch {}
       if (!response.ok) throw new Error(data.error || `Could not remove appointment space (${response.status})`);
       location.reload();
-    } catch (error) {
-      window.alert(error?.message || 'Could not remove appointment space.');
-    }
+    } catch (error) { window.alert(error?.message || 'Could not remove appointment space.'); }
   }
 
   window.removeSlot = removeAvailability;
@@ -128,15 +158,9 @@
       action.setAttribute('role', 'button');
       action.setAttribute('tabindex', '0');
       action.textContent = 'Remove';
-      const run = event => {
-        event.preventDefault();
-        event.stopPropagation();
-        removeAvailability(eventEl.dataset.availableId);
-      };
+      const run = event => { event.preventDefault(); event.stopPropagation(); removeAvailability(eventEl.dataset.availableId); };
       action.addEventListener('click', run);
-      action.addEventListener('keydown', event => {
-        if (event.key === 'Enter' || event.key === ' ') run(event);
-      });
+      action.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') run(event); });
       eventEl.appendChild(action);
     });
 
@@ -147,15 +171,9 @@
       action.setAttribute('role', 'button');
       action.setAttribute('tabindex', '0');
       action.textContent = 'Cancel';
-      const run = event => {
-        event.preventDefault();
-        event.stopPropagation();
-        cancelBooking(eventEl.dataset.bookingId);
-      };
+      const run = event => { event.preventDefault(); event.stopPropagation(); cancelBooking(eventEl.dataset.bookingId); };
       action.addEventListener('click', run);
-      action.addEventListener('keydown', event => {
-        if (event.key === 'Enter' || event.key === ' ') run(event);
-      });
+      action.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') run(event); });
       eventEl.appendChild(action);
     });
   }
@@ -163,6 +181,7 @@
   function boot() {
     installPickerFixes();
     patchTimePickers();
+    patchCalendarTimes();
     addCancelButtons();
     addCalendarActions();
   }
