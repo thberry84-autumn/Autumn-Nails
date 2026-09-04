@@ -7,20 +7,26 @@
     document.querySelectorAll('input[type="time"]').forEach(input => {
       input.min = MIN_TIME;
       input.max = MAX_TIME;
+      input.step = 900;
       if (!input.value || input.value < MIN_TIME || input.value > MAX_TIME) input.value = MIN_TIME;
 
       const wrap = input.closest('.time-picker-wrap');
       if (!wrap) return;
 
+      // The original picker creates a full 06:00–22:00 list. Remove the
+      // out-of-hours choices rather than merely hiding them, so the custom
+      // grid cannot leave empty/scrollable space for the old hours.
       wrap.querySelectorAll('.time-choice').forEach(button => {
         const value = String(button.dataset.time || '').slice(0, 5);
-        button.hidden = !/^\d{2}:\d{2}$/.test(value) || value < MIN_TIME || value > MAX_TIME;
+        if (!/^\d{2}:\d{2}$/.test(value) || value < MIN_TIME || value > MAX_TIME) {
+          button.remove();
+        }
       });
 
       const picker = wrap.querySelector('.time-picker-popover');
       if (picker) {
-        const visible = picker.querySelectorAll('.time-choice:not([hidden])');
-        if (!visible.length) picker.hidden = true;
+        picker.style.maxHeight = 'none';
+        picker.style.overflow = 'visible';
       }
 
       const button = wrap.querySelector('.time-picker-button');
@@ -54,10 +60,28 @@
       let data = {};
       try { data = text ? JSON.parse(text) : {}; } catch {}
       if (!response.ok) throw new Error(data.error || `Could not cancel appointment (${response.status})`);
-      if (typeof window.loadBookings === 'function') await window.loadBookings();
-      else location.hash = '#bookings';
+      location.reload();
     } catch (error) {
       window.alert(error?.message || 'Could not cancel appointment.');
+    }
+  }
+
+  async function removeAvailability(id) {
+    if (!id) return;
+    if (!window.confirm('Remove this appointment space? It will no longer be bookable.')) return;
+    try {
+      const response = await fetch(`${API}/api/availability/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        credentials: 'include',
+        cache: 'no-store'
+      });
+      const text = await response.text();
+      let data = {};
+      try { data = text ? JSON.parse(text) : {}; } catch {}
+      if (!response.ok) throw new Error(data.error || `Could not remove appointment space (${response.status})`);
+      location.reload();
+    } catch (error) {
+      window.alert(error?.message || 'Could not remove appointment space.');
     }
   }
 
@@ -82,9 +106,26 @@
     });
   }
 
+  function addCalendarRemoveHandler() {
+    if (document.body.dataset.calendarRemoveFix === '1') return;
+    document.body.dataset.calendarRemoveFix = '1';
+
+    // Capture the click before studio-calendar.js opens its edit action.
+    // Available calendar spaces can therefore be removed directly from the
+    // calendar rather than forcing a trip down to the Availability table.
+    document.addEventListener('click', event => {
+      const eventEl = event.target.closest?.('.cal-event.available[data-available-id]');
+      if (!eventEl) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      removeAvailability(eventEl.dataset.availableId);
+    }, true);
+  }
+
   function boot() {
     patchTimePickers();
     addCancelButtons();
+    addCalendarRemoveHandler();
   }
 
   const observer = new MutationObserver(boot);
