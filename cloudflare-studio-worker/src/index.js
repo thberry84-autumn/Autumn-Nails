@@ -8,9 +8,26 @@ export default {
       return Response.json({ ok: true, service: "autumn-nails-studio", host: STUDIO_HOST });
     }
 
-    // Payment amendments are handled on the same Studio origin. This avoids
-    // Safari/CORS preflight problems when the Access-protected Studio calls
-    // the separately protected booking API directly from the browser.
+    // Finance reads and payment amendments are handled on the same Studio
+    // origin. This avoids Safari/CORS problems with the separately protected
+    // booking API and keeps the finance screen internally consistent.
+    if (url.pathname === "/api/studio/finance" && request.method === "GET") {
+      if (!ctx?.access) return json({ error: "Studio authentication is required." }, 401);
+      const identity = await ctx.access.getIdentity();
+      if (!identity?.email) return json({ error: "Studio identity could not be verified." }, 403);
+
+      const result = await env.DB.prepare(`SELECT b.id,b.date,b.start_time,b.price_pence,b.price_adjustment_pence,b.final_price_pence,b.payment_status,b.status,c.first_name,c.surname,c.email FROM bookings b JOIN clients c ON c.id=b.client_id ORDER BY b.date DESC,b.start_time DESC`).all();
+      const rows = result.results || [];
+      const totals = rows.reduce((acc, row) => {
+        const value = Number(row.final_price_pence ?? row.price_pence ?? 0);
+        acc.booked += value;
+        if (row.payment_status === "paid") acc.paid += value;
+        if (row.payment_status === "unpaid") acc.unpaid += value;
+        return acc;
+      }, { booked: 0, paid: 0, unpaid: 0 });
+      return json({ rows, totals }, 200);
+    }
+
     if (url.pathname.startsWith("/api/studio/bookings/") && request.method === "PATCH") {
       if (!ctx?.access) return json({ error: "Studio authentication is required." }, 401);
       const identity = await ctx.access.getIdentity();
@@ -66,7 +83,7 @@ export default {
       .replace('<header class="topbar">', '<header class="topbar" id="studioTopbar">');
     const footer = `<footer><div class="wrap footer-grid"><div><a class="brand" href="https://autumnnails.com"><strong>Autumn</strong><span>Nails</span></a><div class="small" style="margin-top:10px">A calm little space for beautiful nails.</div><div class="small" style="margin-top:14px">Studio</div></div><div class="footer-links"><a href="https://autumnnails.com">Customer website</a><a href="https://autumnnails.com/services.html">Services &amp; Booking</a><a href="https://autumnnails.com/gallery.html">Gallery</a><a href="https://autumnnails.com/contact.html">Contact</a></div></div></footer>`;
     const styles = '<link rel="stylesheet" href="/studio.css?v=20260904i"><link rel="stylesheet" href="/studio-payment-amend.css?v=20260904b">';
-    const scripts = '<script src="/studio-actions.js?v=20260904f"></script><script src="/studio-calendar.js?v=20260904f"></script><script src="/studio-booking-fixes.js?v=20260904f"></script><script src="/studio-finance.js?v=20260904c"></script><script>(function(){const clean=()=>document.querySelectorAll("style#studio-polish-css,style:not([id])").forEach(s=>{if(s.id==="studio-polish-css"||s.textContent.includes("#studioCalendar{"))s.remove()});new MutationObserver(clean).observe(document.head,{childList:true});clean()})();</script>';
+    const scripts = '<script src="/studio-actions.js?v=20260904f"></script><script src="/studio-calendar.js?v=20260904f"></script><script src="/studio-booking-fixes.js?v=20260904f"></script><script src="/studio-finance.js?v=20260904d"></script><script>(function(){const clean=()=>document.querySelectorAll("style#studio-polish-css,style:not([id])").forEach(s=>{if(s.id==="studio-polish-css"||s.textContent.includes("#studioCalendar{"))s.remove()});new MutationObserver(clean).observe(document.head,{childList:true});clean()})();</script>';
     const finalHtml = withPublicHeaderBehaviour.replace(/<\/head>/i, `${styles}</head>`).replace(/<\/body>/i, `${footer}${scripts}</body>`);
     const headers = new Headers(response.headers);
     headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
