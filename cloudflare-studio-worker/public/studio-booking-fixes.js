@@ -28,13 +28,9 @@
       const wrap = input.closest('.time-picker-wrap');
       if (!wrap) return;
       if (wrap.dataset.studioTimeRangeFixed === '1') return;
-
       const picker = wrap.querySelector('.time-picker-popover');
       if (!picker) return;
 
-      // Build the complete working range once. The MutationObserver below
-      // watches child changes, so repeatedly assigning innerHTML here would
-      // create an endless mutation loop and leave Studio stuck on Loading.
       const values = [];
       for (let mins = 6 * 60; mins <= 22 * 60; mins += 15) {
         const h = Math.floor(mins / 60);
@@ -49,9 +45,7 @@
       picker.style.overflow = 'visible';
 
       const button = wrap.querySelector('.time-picker-button');
-      if (button && (!button.textContent || button.textContent === 'Choose time')) {
-        button.textContent = current;
-      }
+      if (button && (!button.textContent || button.textContent === 'Choose time')) button.textContent = current;
       wrap.dataset.studioTimeRangeFixed = '1';
     });
   }
@@ -69,12 +63,10 @@
     if (!id) return;
     if (!window.confirm('Cancel this appointment? The released space will become available again.')) return;
     try {
-      const response = await fetch(`${API}/api/bookings/${encodeURIComponent(id)}`, {
-        method: 'PATCH',
+      const response = await fetch(`${API}/api/bookings/${encodeURIComponent(id)}/cancel`, {
+        method: 'POST',
         credentials: 'include',
-        cache: 'no-store',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'cancelled' })
+        cache: 'no-store'
       });
       const text = await response.text();
       let data = {};
@@ -90,8 +82,8 @@
     if (!id) return;
     if (!window.confirm('Remove this appointment space? It will no longer be bookable.')) return;
     try {
-      const response = await fetch(`${API}/api/availability/${encodeURIComponent(id)}`, {
-        method: 'DELETE',
+      const response = await fetch(`${API}/api/availability/${encodeURIComponent(id)}/remove`, {
+        method: 'POST',
         credentials: 'include',
         cache: 'no-store'
       });
@@ -105,16 +97,18 @@
     }
   }
 
+  // Replace the old table action as well, so the Availability table uses the
+  // same preflight-free mutation path as the calendar.
+  window.removeSlot = removeAvailability;
+
   function addCancelButtons() {
     document.querySelectorAll('#bookingTable tbody tr').forEach(row => {
       if (row.dataset.cancelFix === '1') return;
       const id = getBookingId(row);
       if (!id) return;
-
       const select = row.querySelector('select[onchange*="changeBooking"]');
       const cell = select?.parentElement || row.lastElementChild;
       if (!cell) return;
-
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'button secondary';
