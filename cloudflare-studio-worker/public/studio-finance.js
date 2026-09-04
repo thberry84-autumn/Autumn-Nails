@@ -39,10 +39,25 @@
 (() => {
   const retryClientsLoad=()=>{
     if(location.hash.slice(1)!=='clients'||typeof window.loadClients!=='function')return;
-    [150,600,1500].forEach(delay=>setTimeout(()=>{
-      if(location.hash.slice(1)==='clients')window.loadClients();
-    },delay));
+    [150,600,1500].forEach(delay=>setTimeout(()=>{if(location.hash.slice(1)==='clients')window.loadClients()},delay));
   };
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',retryClientsLoad);else retryClientsLoad();
   window.addEventListener('hashchange',retryClientsLoad);
+})();
+(() => {
+  let handled=false;
+  const handleClientAction=e=>{
+    if(location.hash.slice(1)!=='clients')return;
+    const button=e.target.closest('#clientTable button');
+    if(!button||handled)return;
+    const onclick=button.getAttribute('onclick')||'';
+    const match=onclick.match(/(editClient|showHistory)\(['\"]([^'\"]+)['\"]\)/);
+    if(!match)return;
+    const fn=window[match[1]];
+    if(typeof fn!=='function')return;
+    handled=true;
+    e.preventDefault();
+    try{fn(match[2])}finally{setTimeout(()=>{handled=false},0)}
+  };
+  document.addEventListener('click',handleClientAction,true);
 })();
