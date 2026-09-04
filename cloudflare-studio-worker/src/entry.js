@@ -9,11 +9,13 @@ export default {
     const html = await response.text();
     const calendarResponse = await env.ASSETS.fetch(new Request(new URL("/studio-calendar.js", request.url)));
     const calendarSource = calendarResponse.ok ? await calendarResponse.text() : "";
-    const htmlInject = `<script src="/studio-actions.js" defer></script>${calendarSource ? `<script>${calendarSource}</script>` : ""}`;
+    const calendarShell = `<section id="studioCalendar" class="studio-calendar-shell"></section>`;
+    const htmlInject = `${calendarSource ? `<script>${calendarSource}</script>` : ""}`;
+    const withCalendar = html.replace(/<div class="grid" style="margin-bottom:18px">/i, `${calendarShell}<div class="grid" style="margin-bottom:18px">`);
     const headers = new Headers(response.headers);
     headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
 
-    return new Response(html.replace(/<\/body>/i, `${htmlInject}</body>`), {
+    return new Response(withCalendar.replace(/<\/body>/i, `${htmlInject}</body>`), {
       status: response.status,
       statusText: response.statusText,
       headers
