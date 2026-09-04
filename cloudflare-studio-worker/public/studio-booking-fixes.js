@@ -1,13 +1,20 @@
 (() => {
   const API = 'https://studio-booking-api.autumnnails.com';
-  const MIN_TIME = '18:00';
+  const MIN_TIME = '06:00';
   const MAX_TIME = '22:00';
 
-  function installPickerVisibilityFix() {
-    if (document.getElementById('studio-time-picker-visibility-fix')) return;
+  function installPickerFixes() {
+    if (document.getElementById('studio-time-picker-fix')) return;
     const style = document.createElement('style');
-    style.id = 'studio-time-picker-visibility-fix';
-    style.textContent = '.time-picker-popover[hidden]{display:none!important;}';
+    style.id = 'studio-time-picker-fix';
+    style.textContent = `
+      .time-picker-popover[hidden]{display:none!important;}
+      .cal-event.booked.cancelled{display:none!important;}
+      .cal-event .cal-action{display:inline-flex;align-items:center;justify-content:center;margin-top:5px;margin-right:4px;padding:3px 7px;border-radius:999px;border:1px solid rgba(100,52,45,.16);background:rgba(255,255,255,.82);font-size:.56rem;line-height:1.2;font-weight:700;cursor:pointer;text-decoration:none!important;white-space:nowrap;}
+      .cal-event .cal-action:hover{background:white;}
+      .cal-event.available .cal-action.remove{color:#8a4036;}
+      .cal-event.booked .cal-action.cancel{color:#8a4036;}
+    `;
     document.head.appendChild(style);
   }
 
@@ -21,25 +28,28 @@
       const wrap = input.closest('.time-picker-wrap');
       if (!wrap) return;
 
-      // The original picker creates a full 06:00–22:00 list. Remove the
-      // out-of-hours choices rather than merely hiding them, so the custom
-      // grid cannot leave empty/scrollable space for the old hours.
-      wrap.querySelectorAll('.time-choice').forEach(button => {
-        const value = String(button.dataset.time || '').slice(0, 5);
-        if (!/^\d{2}:\d{2}$/.test(value) || value < MIN_TIME || value > MAX_TIME) {
-          button.remove();
-        }
-      });
-
+      // The picker should offer the complete working range, 06:00–22:00.
+      // Rebuild its choices from the allowed range so there is no stale
+      // weekend-only restriction left behind in the original picker.
       const picker = wrap.querySelector('.time-picker-popover');
-      if (picker) {
-        picker.style.maxHeight = 'none';
-        picker.style.overflow = 'visible';
+      if (!picker) return;
+      const values = [];
+      for (let mins = 6 * 60; mins <= 22 * 60; mins += 15) {
+        const h = Math.floor(mins / 60);
+        const m = mins % 60;
+        const value = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+        values.push(value);
       }
+      const current = input.value || MIN_TIME;
+      picker.innerHTML = values.map(value =>
+        `<button type="button" class="time-choice ${value === current ? 'selected' : ''}" data-time="${value}">${value}</button>`
+      ).join('');
+      picker.style.maxHeight = 'none';
+      picker.style.overflow = 'visible';
 
       const button = wrap.querySelector('.time-picker-button');
-      if (button && (!button.textContent || button.textContent === 'Choose time' || button.textContent < MIN_TIME || button.textContent > MAX_TIME)) {
-        button.textContent = input.value || MIN_TIME;
+      if (button && (!button.textContent || button.textContent === 'Choose time')) {
+        button.textContent = current;
       }
     });
   }
@@ -114,27 +124,51 @@
     });
   }
 
-  function addCalendarRemoveHandler() {
-    if (document.body.dataset.calendarRemoveFix === '1') return;
-    document.body.dataset.calendarRemoveFix = '1';
+  function addCalendarActions() {
+    document.querySelectorAll('.cal-event.available[data-available-id]').forEach(eventEl => {
+      if (eventEl.querySelector('.cal-action.remove')) return;
+      const action = document.createElement('span');
+      action.className = 'cal-action remove';
+      action.setAttribute('role', 'button');
+      action.setAttribute('tabindex', '0');
+      action.textContent = 'Remove';
+      const run = event => {
+        event.preventDefault();
+        event.stopPropagation();
+        removeAvailability(eventEl.dataset.availableId);
+      };
+      action.addEventListener('click', run);
+      action.addEventListener('keydown', event => {
+        if (event.key === 'Enter' || event.key === ' ') run(event);
+      });
+      eventEl.appendChild(action);
+    });
 
-    // Capture the click before studio-calendar.js opens its edit action.
-    // Available calendar spaces can therefore be removed directly from the
-    // calendar rather than forcing a trip down to the Availability table.
-    document.addEventListener('click', event => {
-      const eventEl = event.target.closest?.('.cal-event.available[data-available-id]');
-      if (!eventEl) return;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      removeAvailability(eventEl.dataset.availableId);
-    }, true);
+    document.querySelectorAll('.cal-event.booked[data-booking-id]:not(.cancelled)').forEach(eventEl => {
+      if (eventEl.querySelector('.cal-action.cancel')) return;
+      const action = document.createElement('span');
+      action.className = 'cal-action cancel';
+      action.setAttribute('role', 'button');
+      action.setAttribute('tabindex', '0');
+      action.textContent = 'Cancel';
+      const run = event => {
+        event.preventDefault();
+        event.stopPropagation();
+        cancelBooking(eventEl.dataset.bookingId);
+      };
+      action.addEventListener('click', run);
+      action.addEventListener('keydown', event => {
+        if (event.key === 'Enter' || event.key === ' ') run(event);
+      });
+      eventEl.appendChild(action);
+    });
   }
 
   function boot() {
-    installPickerVisibilityFix();
+    installPickerFixes();
     patchTimePickers();
     addCancelButtons();
-    addCalendarRemoveHandler();
+    addCalendarActions();
   }
 
   const observer = new MutationObserver(boot);
