@@ -13,5 +13,12 @@
     "run_worker_first": true,
     "html_handling": "auto-trailing-slash",
     "not_found_handling": "404-page"
-  }
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "autumn-nails-booking",
+      "database_id": "b89756f2-4282-4af0-908a-095b130f5f97"
+    }
+  ]
 }
