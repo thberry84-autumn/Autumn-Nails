@@ -18,3 +18,14 @@
   const loadGalleryControls=()=>{if(location.hash.slice(1)!=='photos')return;if(window.__studioGalleryLoading)return;window.__studioGalleryLoading=true;const script=document.createElement('script');script.src='/studio-gallery.js?v=20260904c';script.onload=()=>{window.__studioGalleryLoading=false;const upload=document.createElement('script');upload.src='/studio-gallery-upload.js?v=20260904a';document.body.appendChild(upload)};script.onerror=()=>{window.__studioGalleryLoading=false;console.error('Studio gallery controls failed to load')};document.body.appendChild(script)};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',loadGalleryControls);else loadGalleryControls();window.addEventListener('hashchange',loadGalleryControls);
 })();
+(() => {
+  const removeDuplicateTreatmentButtons=()=>{
+    if(location.hash.slice(1)!=='clients')return;
+    const buttons=[...document.querySelectorAll('#recordTreatment')];
+    buttons.slice(1).forEach(button=>button.remove());
+  };
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',removeDuplicateTreatmentButtons);else removeDuplicateTreatmentButtons();
+  window.addEventListener('hashchange',()=>{if(location.hash.slice(1)==='clients'){removeDuplicateTreatmentButtons();setTimeout(removeDuplicateTreatmentButtons,100);setTimeout(removeDuplicateTreatmentButtons,500)}});
+  const observer=new MutationObserver(()=>{if(location.hash.slice(1)==='clients')removeDuplicateTreatmentButtons()});
+  observer.observe(document.body,{childList:true,subtree:true});
+})();
