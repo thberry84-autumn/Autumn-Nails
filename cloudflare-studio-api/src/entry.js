@@ -14,6 +14,31 @@ export default {
     const origin = STUDIO_ORIGIN;
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors(origin) });
 
+    if (request.method === "POST" && url.pathname === "/api/availability") {
+      try {
+        const type = request.headers.get("content-type") || "";
+        let body;
+        if (type.includes("application/x-www-form-urlencoded")) {
+          const form = await request.formData();
+          body = {
+            date: String(form.get("date") || ""),
+            startTime: String(form.get("startTime") || ""),
+            serviceIds: parseJson(String(form.get("serviceIds") || "[]"), [])
+          };
+        } else {
+          body = await request.json();
+        }
+        const headers = new Headers(request.headers);
+        headers.set("Content-Type", "application/json");
+        const translated = new Request(request, { method: "POST", headers, body: JSON.stringify(body) });
+        return studioWorker.fetch(translated, env, ctx);
+      } catch (error) {
+        if (error?.status) return json({ error: error.message }, error.status, origin);
+        console.error("Availability transport failed", error);
+        return json({ error: "Invalid availability request." }, 400, origin);
+      }
+    }
+
     // Gallery metadata is written by Studio using a simple POST transport.
     // This avoids an Access-protected CORS preflight in Safari while keeping
     // the existing authenticated PUT implementation as the source of truth.
@@ -49,7 +74,6 @@ export default {
         return json({ error: "Something went wrong. Please try again." }, 500, origin);
       }
     }
-
     if (request.method === "POST" && (url.pathname.startsWith("/api/availability/") || url.pathname.startsWith("/api/bookings/"))) {
       try {
         const response = await handleStudioMutation(request, env, ctx, origin, url.pathname);
