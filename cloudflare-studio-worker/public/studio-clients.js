@@ -6,6 +6,7 @@
   };
   let clients = [];
   let currentId = null;
+  let ready = false;
   const $ = id => document.getElementById(id);
 
   async function request(path, options = {}) {
@@ -18,6 +19,11 @@
   function closePanels() {
     $('clientEdit')?.classList.add('hidden');
     $('history')?.classList.add('hidden');
+  }
+
+  function scrollToPanel(panel) {
+    if (!panel) return;
+    requestAnimationFrame(() => requestAnimationFrame(() => panel.scrollIntoView({behavior:'smooth', block:'start'})));
   }
 
   function render() {
@@ -38,16 +44,19 @@
 
   function openEditor(client = null) {
     currentId = client?.id || null;
-    $('clientEdit').classList.remove('hidden');
+    const panel = $('clientEdit');
+    if (!panel) return;
+    panel.classList.remove('hidden');
+    $('history')?.classList.add('hidden');
     $('editFirst').value = client?.first_name || '';
     $('editSurname').value = client?.surname || '';
     $('editEmail').value = client?.email || '';
     $('editPhone').value = client?.phone || '';
     $('editMarketing').checked = !!client?.marketing_opt_in;
     $('clientMsg').textContent = '';
-    $('clientEdit').querySelector('h2').textContent = currentId ? 'Edit client' : 'Add new client';
-    requestAnimationFrame(() => $('clientEdit').scrollIntoView({behavior:'smooth', block:'start'}));
-    $('editFirst').focus();
+    panel.querySelector('h2').textContent = currentId ? 'Edit client' : 'Add new client';
+    scrollToPanel(panel);
+    setTimeout(() => $('editFirst')?.focus(), 250);
   }
 
   async function save() {
@@ -65,36 +74,55 @@
   }
 
   async function history(id) {
+    const panel = $('history');
+    const list = $('historyList');
+    if (!panel || !list) return;
+    panel.classList.remove('hidden');
+    $('clientEdit')?.classList.add('hidden');
+    list.innerHTML = '<div class="empty">Loading history…</div>';
+    scrollToPanel(panel);
     try {
       const data = await request('/' + encodeURIComponent(id) + '/history');
-      $('history').classList.remove('hidden');
       $('historyTitle').textContent = `${data.client.first_name} ${data.client.surname}`;
       const rows = data.history || [];
-      $('historyList').innerHTML = rows.length ? rows.map(row => `<div class="stat" style="margin-bottom:10px"><strong>${services.escape(row.date)} ${services.escape(row.start_time||'')}</strong><div class="muted">${services.escape(row.booked_service_id||row.service_id||'')} · ${services.money(row.final_price_pence ?? row.price_pence)} · ${services.escape(row.status)} · ${services.escape(row.payment_status||'unpaid')}</div>${row.metadata?.notes ? `<div class="note">${services.escape(row.metadata.notes)}</div>` : ''}</div>`).join('') : '<div class="empty">No treatment history recorded.</div>';
-      requestAnimationFrame(() => $('history').scrollIntoView({behavior:'smooth', block:'start'}));
-    } catch(error) { $('historyList').innerHTML=`<div class="error">${services.escape(error.message)}</div>`; $('history').classList.remove('hidden'); }
+      list.innerHTML = rows.length ? rows.map(row => `<div class="stat" style="margin-bottom:10px"><strong>${services.escape(row.date)} ${services.escape(row.start_time||'')}</strong><div class="muted">${services.escape(row.booked_service_id||row.service_id||'')} · ${services.money(row.final_price_pence ?? row.price_pence)} · ${services.escape(row.status)} · ${services.escape(row.payment_status||'unpaid')}</div>${row.metadata?.notes ? `<div class="note">${services.escape(row.metadata.notes)}</div>` : ''}</div>`).join('') : '<div class="empty">No treatment history recorded.</div>';
+      scrollToPanel(panel);
+    } catch(error) {
+      list.innerHTML=`<div class="error">${services.escape(error.message)}</div>`;
+      scrollToPanel(panel);
+    }
   }
 
-  function init() {
-    if (location.hash.slice(1) !== 'clients') return;
+  function bind() {
+    if (ready) return;
     const search = $('clientSearch'), add = $('newClient'), saveButton = $('saveClient'), close = $('closeClient'), table = $('clientTable');
-    if (!table || table.dataset.studioClientsReady === '1') { load(); return; }
-    table.dataset.studioClientsReady = '1';
+    if (!table) return;
+    ready = true;
     if (search) search.oninput = render;
     if (add) add.onclick = () => openEditor();
     if (saveButton) saveButton.onclick = save;
     if (close) close.onclick = () => $('clientEdit').classList.add('hidden');
     document.addEventListener('click', event => {
       const edit = event.target.closest('[data-client-edit]');
-      if (edit) { const client = clients.find(c => c.id === edit.dataset.clientEdit); if (client) openEditor(client); return; }
+      if (edit) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        const client = clients.find(c => c.id === edit.dataset.clientEdit);
+        if (client) openEditor(client);
+        return;
+      }
       const hist = event.target.closest('[data-client-history]');
-      if (hist) { history(hist.dataset.clientHistory); return; }
-    });
-    load();
+      if (hist) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        history(hist.dataset.clientHistory);
+      }
+    }, true);
   }
 
   window.showHistory = history;
   window.studioClientsReload = load;
+  const init = () => { if (location.hash.slice(1) === 'clients') { bind(); load(); } };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
-  window.addEventListener('hashchange', () => { if (location.hash.slice(1) === 'clients') { closePanels(); setTimeout(init, 20); } });
+  window.addEventListener('hashchange', () => { if (location.hash.slice(1) === 'clients') { closePanels(); init(); } });
 })();
