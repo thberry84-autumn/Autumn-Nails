@@ -3,6 +3,14 @@
   const MIN_TIME = '18:00';
   const MAX_TIME = '22:00';
 
+  function installPickerVisibilityFix() {
+    if (document.getElementById('studio-time-picker-visibility-fix')) return;
+    const style = document.createElement('style');
+    style.id = 'studio-time-picker-visibility-fix';
+    style.textContent = '.time-picker-popover[hidden]{display:none!important;}';
+    document.head.appendChild(style);
+  }
+
   function patchTimePickers() {
     document.querySelectorAll('input[type="time"]').forEach(input => {
       input.min = MIN_TIME;
@@ -123,6 +131,7 @@
   }
 
   function boot() {
+    installPickerVisibilityFix();
     patchTimePickers();
     addCancelButtons();
     addCalendarRemoveHandler();
