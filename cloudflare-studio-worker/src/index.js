@@ -1,11 +1,56 @@
 const STUDIO_HOST = "studio.autumnnails.com";
+const STUDIO_ORIGIN = "https://studio.autumnnails.com";
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
     if (url.pathname === "/health") {
       return Response.json({ ok: true, service: "autumn-nails-studio", host: STUDIO_HOST });
+    }
+
+    // Payment amendments are handled on the same Studio origin. This avoids
+    // Safari/CORS preflight problems when the Access-protected Studio calls
+    // the separately protected booking API directly from the browser.
+    if (url.pathname.startsWith("/api/studio/bookings/") && request.method === "PATCH") {
+      if (!ctx?.access) return json({ error: "Studio authentication is required." }, 401);
+      const identity = await ctx.access.getIdentity();
+      if (!identity?.email) return json({ error: "Studio identity could not be verified." }, 403);
+
+      const id = String(url.pathname.split("/").pop());
+      if (!/^[0-9a-f-]{36}$/i.test(id)) return json({ error: "Invalid booking." }, 400);
+
+      let body;
+      try {
+        body = await request.json();
+      } catch {
+        return json({ error: "Invalid request body." }, 400);
+      }
+
+      const current = await env.DB.prepare("SELECT * FROM bookings WHERE id=? LIMIT 1").bind(id).first();
+      if (!current) return json({ error: "Booking not found." }, 404);
+
+      const allowedPayment = new Set(["unpaid", "paid", "refunded", "not-required"]);
+      const payment = body.paymentStatus == null ? current.payment_status : String(body.paymentStatus);
+      if (!allowedPayment.has(payment)) return json({ error: "Invalid payment status." }, 400);
+
+      const adjustment = body.priceAdjustmentPence == null
+        ? Number(current.price_adjustment_pence || 0)
+        : Math.round(Number(body.priceAdjustmentPence));
+      if (!Number.isFinite(adjustment) || adjustment < -100000 || adjustment > 100000) {
+        return json({ error: "Invalid price adjustment." }, 400);
+      }
+
+      const finalPrice = Math.max(0, Number(current.price_pence || 0) + adjustment);
+      const now = new Date().toISOString();
+      await env.DB.batch([
+        env.DB.prepare("UPDATE bookings SET payment_status=?,price_adjustment_pence=?,final_price_pence=?,updated_at=? WHERE id=?")
+          .bind(payment, adjustment, finalPrice, now, id),
+        env.DB.prepare("INSERT INTO booking_events (id,booking_id,event_type,metadata_json,created_at) VALUES (?,?,?,?,?)")
+          .bind(crypto.randomUUID(), id, "studio_payment_amended", JSON.stringify({ paymentStatus: payment, priceAdjustmentPence: adjustment, finalPricePence: finalPrice, by: identity.email }), now)
+      ]);
+
+      return json({ ok: true, paymentStatus: payment, priceAdjustmentPence: adjustment, finalPricePence: finalPrice });
     }
 
     const response = await env.ASSETS.fetch(request);
@@ -34,3 +79,13 @@ export default {
     });
   }
 };
+
+function json(data, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "no-store"
+    }
+  });
+}
