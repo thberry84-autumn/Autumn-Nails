@@ -1,6 +1,7 @@
 import studioWorker from "./index.js";
 import { handleStudioAction } from "./studio-actions.js";
 import { handleBookingStatusUpdate } from "./booking-status.js";
+import { handleAvailabilityEdit } from "./availability-edit.js";
 
 const STUDIO_ORIGIN = "https://studio.autumnnails.com";
 
@@ -12,6 +13,16 @@ export default {
     if (request.method === "PATCH" && url.pathname.startsWith("/api/bookings/")) {
       try {
         const response = await handleBookingStatusUpdate(request, env, ctx, origin, url.pathname);
+        if (response) return response;
+      } catch (error) {
+        if (error?.status) return json({ error: error.message }, error.status, origin);
+        console.error(error);
+        return json({ error: "Something went wrong. Please try again." }, 500, origin);
+      }
+    }
+    if (request.method === "PATCH" && url.pathname.startsWith("/api/availability/")) {
+      try {
+        const response = await handleAvailabilityEdit(request, env, ctx, origin, url.pathname);
         if (response) return response;
       } catch (error) {
         if (error?.status) return json({ error: error.message }, error.status, origin);
