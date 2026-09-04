@@ -35,28 +35,19 @@
     }
   }
 
-  // setView() in the original Studio page calls the legacy global api() helper
-  // directly. Redirect only its finance GET to the same-origin route so the
-  // old cross-origin loader cannot overwrite the working finance screen.
   const originalApi = window.api;
   if (typeof originalApi === 'function') {
     window.api = function(base, path, options = {}) {
-      if (base === API && path === '/api/finance' && (!options.method || options.method === 'GET')) {
-        return sameOriginFinance();
-      }
+      if (base === API && path === '/api/finance' && (!options.method || options.method === 'GET')) return sameOriginFinance();
       return originalApi(base, path, options);
     };
   }
-
   window.loadFinance = loadFinanceSameOrigin;
 
   async function savePayment(bookingId, payload) {
     const response = await fetch('/api/studio/bookings/' + encodeURIComponent(bookingId), {
-      method: 'PATCH',
-      credentials: 'include',
-      cache: 'no-store',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      method: 'PATCH', credentials: 'include', cache: 'no-store',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.error || `Could not save changes (${response.status})`);
@@ -76,15 +67,12 @@
       <section class="finance-amend-modal" role="dialog" aria-modal="true" aria-labelledby="finance-amend-title">
         <div class="finance-amend-dialog">
           <button type="button" class="finance-amend-close" aria-label="Close">×</button>
-          <div class="kicker">Payment</div>
-          <h2 id="finance-amend-title">Amend payment</h2>
+          <div class="kicker">Payment</div><h2 id="finance-amend-title">Amend payment</h2>
           <p class="muted">Adjust the final charge or update the payment status for this booking.</p>
           <div class="finance-amend-summary"><strong>${escapeHtml(client)}</strong><br>${escapeHtml(date)} · Original charge ${money(originalPence)}</div>
           <div class="finance-amend-fields">
             <label>Adjustment £<input class="finance-adjustment" type="number" step="0.01" value="${escapeHtml(currentAdjustment.toFixed(2))}" inputmode="decimal" autocomplete="off"></label>
-            <label>Payment<select class="finance-payment">
-              <option value="unpaid">Unpaid</option><option value="paid">Paid</option><option value="refunded">Refunded</option><option value="not-required">Not required</option>
-            </select></label>
+            <label>Payment<select class="finance-payment"><option value="unpaid">Unpaid</option><option value="paid">Paid</option><option value="refunded">Refunded</option><option value="not-required">Not required</option></select></label>
           </div>
           <div class="finance-amend-preview"><span>Final charge</span><strong class="finance-final-preview">${money(originalPence + moneyToPence(currentAdjustment))}</strong></div>
           <div class="actions"><span class="msg finance-amend-msg"></span><button type="button" class="button secondary finance-cancel">Cancel</button><button type="button" class="button finance-save">Save changes</button></div>
@@ -100,29 +88,36 @@
     const close = backdrop.querySelector('.finance-amend-close');
     const message = backdrop.querySelector('.finance-amend-msg');
     payment.value = currentPayment;
-
     const updatePreview = () => preview.textContent = money(originalPence + moneyToPence(input.value));
     const selectAmount = () => requestAnimationFrame(() => { input.focus(); input.select(); });
     input.addEventListener('focus', () => requestAnimationFrame(() => input.select()));
     input.addEventListener('input', updatePreview);
     const dismiss = () => closeModal(backdrop, button);
-    close.addEventListener('click', dismiss);
-    cancel.addEventListener('click', dismiss);
+    close.addEventListener('click', dismiss); cancel.addEventListener('click', dismiss);
     backdrop.addEventListener('click', event => { if (event.target === backdrop) dismiss(); });
     document.addEventListener('keydown', function onKey(event) { if (event.key === 'Escape') { dismiss(); document.removeEventListener('keydown', onKey); } }, { once: true });
 
     save.addEventListener('click', async () => {
       const adjustmentPence = moneyToPence(input.value);
       if (!Number.isFinite(adjustmentPence) || adjustmentPence < -100000 || adjustmentPence > 100000) {
-        message.textContent = 'Enter an adjustment between -£1,000 and £1,000.';
-        return;
+        message.textContent = 'Enter an adjustment between -£1,000 and £1,000.'; return;
       }
       save.disabled = true; cancel.disabled = true; close.disabled = true; message.textContent = 'Saving…';
       try {
-        await savePayment(bookingId, { priceAdjustmentPence: adjustmentPence, paymentStatus: payment.value });
+        const result = await savePayment(bookingId, { priceAdjustmentPence: adjustmentPence, paymentStatus: payment.value });
+        // The PATCH response is the authoritative save result. Do not let a
+        // later finance refresh failure turn a successful save into "Load failed".
         message.textContent = 'Saved';
-        await loadFinanceSameOrigin();
-        backdrop.remove(); button.disabled = false;
+        backdrop.remove();
+        button.disabled = false;
+        try {
+          const refreshed = await sameOriginFinance();
+          renderFinance(refreshed);
+          await enhanceFinance(refreshed);
+        } catch (refreshError) {
+          console.warn('Payment saved, but finance refresh failed', refreshError);
+        }
+        return result;
       } catch (error) {
         message.textContent = error.message || 'Could not save changes.';
         save.disabled = false; cancel.disabled = false; close.disabled = false;
@@ -141,21 +136,17 @@
     if (![...header.children].some(cell => cell.textContent.trim() === 'Actions')) { const th = document.createElement('th'); th.textContent = 'Actions'; header.appendChild(th); }
     [...table.querySelectorAll('tbody tr')].forEach((row, index) => {
       if (row.dataset.amendButton === '1') return;
-      const cells = [...row.querySelectorAll('td')];
-      if (cells.length < 6) return;
+      const cells = [...row.querySelectorAll('td')]; if (cells.length < 6) return;
       const bookingId = rows[index]?.id;
       const actionCell = document.createElement('td'); actionCell.className = 'finance-actions'; row.appendChild(actionCell);
       const button = document.createElement('button'); button.type = 'button'; button.className = 'button secondary'; button.textContent = 'Amend'; button.disabled = !bookingId;
       if (!bookingId) button.title = 'Booking record could not be matched.';
-      actionCell.appendChild(button); row.dataset.amendButton = '1';
-      if (!bookingId) return;
+      actionCell.appendChild(button); row.dataset.amendButton = '1'; if (!bookingId) return;
       button.addEventListener('click', () => openAmendModal({ bookingId, client: cells[1].textContent.trim(), date: cells[0].textContent.trim(), originalPence: moneyToPence(cells[2].textContent.trim().replace(/£/g, '')), adjustmentText: cells[3].textContent.trim(), paymentText: cells[5].textContent.trim().toLowerCase(), button }));
     });
     table.dataset.amendReady = '1';
   }
 
   if (location.hash.slice(1) === 'finance') loadFinanceSameOrigin();
-  window.addEventListener('hashchange', () => {
-    if (location.hash.slice(1) === 'finance') loadFinanceSameOrigin();
-  });
+  window.addEventListener('hashchange', () => { if (location.hash.slice(1) === 'finance') loadFinanceSameOrigin(); });
 })();
