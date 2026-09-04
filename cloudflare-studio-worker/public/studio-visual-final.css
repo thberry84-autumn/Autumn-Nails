@@ -1,0 +1,38 @@
+/* Final Studio visual alignment: match the public Autumn Nails layout rhythm without changing functionality. */
+
+/* The public site and Studio use the same 1120px content rail. Keep the shell locked to it. */
+.wrap { width: min(1120px, calc(100% - 32px)); margin-inline: auto; padding: 0 0 70px; }
+
+/* Match the public navigation proportions. Studio keeps its account controls, so the nav is allowed to compress gracefully. */
+.topbar { min-height: 164px; padding: 10px 14px 10px 24px; gap: 18px; }
+.brand { width: 240px; height: 118px; flex: 0 0 240px; }
+.brand img { width: 240px; height: 112px; object-fit: contain; object-position: left center; }
+.nav { gap: 18px; font-size: .72rem; letter-spacing: .14em; }
+.who { font-size: .68rem; }
+.logout { min-height: 44px; padding: 12px 17px; font-size: .70rem; }
+
+/* Give every Studio section the same generous separation from the navigation as the public site. */
+.view > .hero { padding: 112px 0 46px; }
+.view > .hero h1 { margin: 18px 0 20px; }
+.view > .hero p { max-width: 700px; }
+
+/* Calendar is a primary page section, not a boxed mini-widget floating inside another page. */
+#studioCalendar { margin-top: 0 !important; }
+
+/* Keep the calendar's internal rhythm aligned with the public site's section spacing. */
+#studioCalendar .studio-calendar-head { margin-bottom: 26px; }
+#studioCalendar .studio-calendar-summary { margin-bottom: 20px; }
+
+@media (max-width: 1180px) {
+  .brand { width: 220px; flex-basis: 220px; }
+  .brand img { width: 220px; }
+  .nav { gap: 14px; }
+  .who { display: none; }
+}
+
+@media (max-width: 800px) {
+  .topbar { min-height: 100px; }
+  .brand { width: 225px; height: 84px; flex-basis: 225px; }
+  .brand img { width: 220px; height: 84px; }
+  .view > .hero { padding: 54px 0 34px; }
+}
