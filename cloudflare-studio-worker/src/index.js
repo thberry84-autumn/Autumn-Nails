@@ -12,9 +12,8 @@ export default {
     // origin. This avoids Safari/CORS problems with the separately protected
     // booking API and keeps the finance screen internally consistent.
     if (url.pathname === "/api/studio/finance" && request.method === "GET") {
-      if (!ctx?.access) return json({ error: "Studio authentication is required." }, 401);
-      const identity = await ctx.access.getIdentity();
-      if (!identity?.email) return json({ error: "Studio identity could not be verified." }, 403);
+      const identity = await getStudioIdentity(request, ctx);
+      if (!identity?.email) return json({ error: "Studio authentication is required." }, 401);
 
       const result = await env.DB.prepare(`SELECT b.id,b.date,b.start_time,b.price_pence,b.price_adjustment_pence,b.final_price_pence,b.payment_status,b.status,c.first_name,c.surname,c.email FROM bookings b JOIN clients c ON c.id=b.client_id ORDER BY b.date DESC,b.start_time DESC`).all();
       const rows = result.results || [];
@@ -29,9 +28,8 @@ export default {
     }
 
     if (url.pathname.startsWith("/api/studio/bookings/") && request.method === "PATCH") {
-      if (!ctx?.access) return json({ error: "Studio authentication is required." }, 401);
-      const identity = await ctx.access.getIdentity();
-      if (!identity?.email) return json({ error: "Studio identity could not be verified." }, 403);
+      const identity = await getStudioIdentity(request, ctx);
+      if (!identity?.email) return json({ error: "Studio authentication is required." }, 401);
 
       const id = String(url.pathname.split("/").pop());
       if (!/^[0-9a-f-]{36}$/i.test(id)) return json({ error: "Invalid booking." }, 400);
@@ -99,6 +97,20 @@ export default {
     });
   }
 };
+
+async function getStudioIdentity(request, ctx) {
+  // Cloudflare Access may expose the identity through ctx.access when the
+  // Worker is invoked with Access context. When the custom-domain Access
+  // application injects the authenticated identity header instead, accept
+  // that trusted Access header as the fallback. This keeps same-origin Studio
+  // routes usable without weakening the Access policy at the edge.
+  if (ctx?.access) {
+    const identity = await ctx.access.getIdentity();
+    if (identity?.email) return identity;
+  }
+  const email = request.headers.get("Cf-Access-Authenticated-User-Email") || request.headers.get("CF-Access-Authenticated-User-Email");
+  return email ? { email } : null;
+}
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
