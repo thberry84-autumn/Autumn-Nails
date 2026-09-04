@@ -2,6 +2,13 @@ name: Deploy Autumn Nails Studio
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'cloudflare-studio-worker/**'
+      - 'cloudflare-studio-api/**'
+      - '.github/workflows/deploy-studio.yml'
 
 permissions:
   contents: read
@@ -51,7 +58,12 @@ jobs:
 
       - name: Check Studio API JavaScript syntax
         working-directory: cloudflare-studio-api
-        run: node --check src/entry.js
+        run: |
+          node --check src/entry.js
+          node --check src/index.js
+          node --check src/booking-status.js
+          node --check src/availability-edit.js
+          node --check src/studio-actions.js
 
       - name: Prepare Studio API secrets
         working-directory: cloudflare-studio-api
