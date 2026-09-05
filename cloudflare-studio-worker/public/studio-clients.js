@@ -8,7 +8,41 @@
   let currentId = null;
   let ready = false;
   const $ = id => document.getElementById(id);
-  async function request(path = '', options = {}) { const response = await fetch(API + path, { ...options, credentials:'include', cache:'no-store', headers:{'Content-Type':'application/json', ...(options.headers||{})} }); const data = await response.json().catch(() => ({})); if (!response.ok) throw new Error(data.error || 'Client request failed.'); return data; }
+
+  // The main Studio page keeps the canonical API helper in its inline script.
+  // Expose the same helper globally so legacy enhancement modules loaded as
+  // separate classic scripts can use it without relying on lexical scope.
+  if (typeof window.api !== 'function') {
+    window.api = async function(base, path, options = {}) {
+      const headers = new Headers(options.headers || {});
+      if (options.body && !(options.body instanceof FormData) && !headers.has('Content-Type')) {
+        headers.set('Content-Type', 'application/json');
+      }
+      const response = await fetch(base + path, {
+        ...options,
+        headers,
+        credentials: 'include',
+        cache: 'no-store'
+      });
+      const data = await response.json().catch(() => ({}));
+      if (response.status === 401 || response.status === 403) {
+        throw new Error('Studio authentication is not active for this API yet.');
+      }
+      if (!response.ok) throw new Error(data.error || 'Request failed');
+      return data;
+    };
+  }
+
+  async function request(path = '', options = {}) {
+    const headers = new Headers(options.headers || {});
+    if (options.body && !(options.body instanceof FormData) && !headers.has('Content-Type')) {
+      headers.set('Content-Type', 'application/json');
+    }
+    const response = await fetch(API + path, { ...options, credentials:'include', cache:'no-store', headers });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Client request failed.');
+    return data;
+  }
   function closePanels() { $('clientEdit')?.classList.add('hidden'); $('history')?.classList.add('hidden'); }
   function scrollToPanel(panel) { if (!panel) return; requestAnimationFrame(() => setTimeout(() => { const top = panel.getBoundingClientRect().top + window.scrollY - 210; window.scrollTo({ top: Math.max(0, top), behavior:'smooth' }); }, 40)); }
   function render() { const host = $('clientTable'); if (!host) return; const query = String($('clientSearch')?.value || '').trim().toLowerCase(); const rows = clients.filter(c => (`${c.first_name} ${c.surname} ${c.email} ${c.phone}`).toLowerCase().includes(query)); host.innerHTML = rows.length ? `<div class="table-wrap"><table><thead><tr><th>Client</th><th>Contact</th><th>Bookings</th><th>Last booking</th><th>Marketing</th><th>Actions</th></tr></thead><tbody>${rows.map(c => `<tr><td><strong>${services.escape(c.first_name+' '+c.surname)}</strong></td><td>${services.escape(c.email)}<br>${services.escape(c.phone)}</td><td>${Number(c.booking_count||0)}</td><td>${services.escape(c.last_booking_date||'—')}</td><td>${c.marketing_opt_in ? '<span class="tag">Opted in</span>' : '—'}</td><td><div class="client-actions"><button type="button" class="button secondary" data-client-edit="${services.escape(c.id)}">Edit</button><button type="button" class="button" data-client-history="${services.escape(c.id)}">History</button></div></td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">No clients found.</div>'; }
