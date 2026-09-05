@@ -16,8 +16,16 @@
       .cal-event.booked .cal-action.cancel{color:#8a4036;}
       .studio-calendar{grid-template-rows:auto 840px!important;}
       .cal-time-column,.cal-day{height:840px!important;}
+      .studio-calendar-key .cal-dot{display:inline-block!important;width:9px!important;height:9px!important;min-width:9px!important;min-height:9px!important;padding:0!important;margin:0!important;border-radius:50%!important;box-sizing:border-box!important;}
+      .studio-calendar-key .cal-dot.empty{background:#fff!important;border:1px solid var(--line)!important;}
     `;
     document.head.appendChild(style);
+  }
+
+  function patchDateInputs() {
+    document.querySelectorAll('input[type="date"]').forEach(input => {
+      input.setAttribute('lang', 'en-GB');
+    });
   }
 
   function patchTimePickers() {
@@ -180,6 +188,7 @@
 
   function boot() {
     installPickerFixes();
+    patchDateInputs();
     patchTimePickers();
     patchCalendarTimes();
     addCancelButtons();
