@@ -1,0 +1,75 @@
+name: Validate Autumn Nails Studio
+
+on:
+  pull_request:
+    paths:
+      - 'cloudflare-studio-worker/**'
+      - 'cloudflare-studio-api/**'
+      - '.github/workflows/validate-studio.yml'
+  push:
+    branches-ignore:
+      - main
+    paths:
+      - 'cloudflare-studio-worker/**'
+      - 'cloudflare-studio-api/**'
+      - '.github/workflows/validate-studio.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-studio:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Check Studio Worker JavaScript syntax
+        working-directory: cloudflare-studio-worker
+        run: node --check src/index.js
+
+      - name: Check Studio API JavaScript syntax
+        working-directory: cloudflare-studio-api
+        run: |
+          node --check src/entry.js
+          node --check src/index.js
+          node --check src/booking-status.js
+          node --check src/availability-edit.js
+          node --check src/studio-actions.js
+
+      - name: Validate canonical Studio page
+        working-directory: cloudflare-studio-worker
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s public/index.html
+          grep -Fq '<section id="studioCalendar"' public/index.html
+          grep -Fq 'href="/studio.css?v=20260904i"' public/index.html
+          grep -Fq 'href="/studio-payment-amend.css?v=20260904b"' public/index.html
+          for asset in \
+            studio-actions.js \
+            studio-calendar.js \
+            studio-booking-fixes.js \
+            studio-finance.js \
+            studio-clients.js \
+            studio-availability-fix.js; do
+            grep -Fq "src=\"/$asset" public/index.html
+            test -s "public/$asset"
+          done
+
+      - name: Confirm Worker no longer performs HTML surgery
+        working-directory: cloudflare-studio-worker
+        shell: bash
+        run: |
+          set -euo pipefail
+          ! grep -Fq 'replace(/<section id="bookings"' src/index.js
+          ! grep -Fq 'studioCalendarShell' src/index.js
+          ! grep -Fq 'MutationObserver' src/index.js
+          ! grep -Fq 'studio-availability-fix.js' src/index.js
