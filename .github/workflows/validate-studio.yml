@@ -38,11 +38,36 @@ jobs:
       - name: Check Studio API JavaScript syntax
         working-directory: cloudflare-studio-api
         run: |
-          node --check src/entry.js
-          node --check src/index.js
-          node --check src/booking-status.js
-          node --check src/availability-edit.js
-          node --check src/studio-actions.js
+          for file in src/*.js; do
+            node --check "$file"
+          done
+
+      - name: Check Studio public JavaScript syntax
+        working-directory: cloudflare-studio-worker
+        run: |
+          set -euo pipefail
+          for file in public/*.js; do
+            node --check "$file"
+          done
+
+      - name: Check inline Studio JavaScript syntax
+        working-directory: cloudflare-studio-worker
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          import subprocess
+          html = Path('public/index.html').read_text(encoding='utf-8')
+          scripts = re.findall(r'<script(?:\s[^>]*)?>(.*?)</script>', html, flags=re.S | re.I)
+          if not scripts:
+              raise SystemExit('No inline Studio scripts found')
+          for index, script in enumerate(scripts, 1):
+              path = Path(f'/tmp/studio-inline-{index}.js')
+              path.write_text(script, encoding='utf-8')
+              subprocess.run(['node', '--check', str(path)], check=True)
+          print(f'Checked {len(scripts)} inline Studio script(s).')
+          PY
 
       - name: Validate canonical Studio page
         working-directory: cloudflare-studio-worker
@@ -59,7 +84,9 @@ jobs:
             studio-booking-fixes.js \
             studio-finance.js \
             studio-clients.js \
-            studio-availability-fix.js; do
+            studio-availability-fix.js \
+            studio-gallery.js \
+            studio-gallery-upload.js; do
             grep -Fq "src=\"/$asset" public/index.html
             test -s "public/$asset"
           done
