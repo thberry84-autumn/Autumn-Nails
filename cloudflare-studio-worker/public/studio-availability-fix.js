@@ -20,7 +20,7 @@
 
   const install=()=>{
     const button=document.getElementById('addSlot');
-    if(button&&button.dataset.sameOriginAvailability!=='1'){button.dataset.sameOriginAvailability='1';button.onclick=postAvailability}
+    if(button&&!button.dataset.calendarAvailabilityBound&&button.dataset.sameOriginAvailability!=='1'){button.dataset.sameOriginAvailability='1';button.onclick=postAvailability}
     installEditor();
   };
 
