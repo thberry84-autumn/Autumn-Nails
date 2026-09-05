@@ -21,7 +21,7 @@
     const host = gallery(); if(!host) return;
     try {
       const data = await api(MEDIA,'/api/gallery');
-      const list = data.files || [];
+      const list = data.files || data.items || [];
       if(!list.length){ host.innerHTML='<div class="empty">No photos in the gallery yet.</div>'; return; }
       host.innerHTML = list.map((p,i) => `<article class="photo gallery-photo" data-photo-name="${esc(p.name)}"><img src="${esc(p.url)}" alt="${esc(p.caption || 'Autumn Nails')}" loading="lazy"><div class="inside"><div class="gallery-photo-meta">${p.homepage?'<span class="gallery-home-badge">★ Homepage</span>':''}<span class="gallery-position">${i+1} of ${list.length}</span></div><input value="${esc(p.caption || '')}" maxlength="180" aria-label="Caption" placeholder="Add a caption…"><div class="gallery-actions"><button class="button gallery-caption-save" type="button">Save caption</button><div class="gallery-move-group"><button class="button secondary gallery-move-left" type="button" aria-label="Move photo left" title="Move left" ${i===0?'disabled':''}>←</button><button class="button secondary gallery-move-right" type="button" aria-label="Move photo right" title="Move right" ${i===list.length-1?'disabled':''}>→</button></div><button class="button secondary gallery-home" type="button" ${p.homepage?'disabled':''}>★ Set homepage</button><button class="button secondary gallery-delete" type="button">Delete</button></div></div></article>`).join('');
       host.querySelectorAll('.photo').forEach(card => {
@@ -42,6 +42,8 @@
     [names[i],names[target]]=[names[target],names[i]];
     try{await write({order:names});await loadGalleryControls()}catch(e){alert(e.message)}
   }
+  window.__studioReloadGallery = loadGalleryControls;
+  window.loadGallery = loadGalleryControls;
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',loadGalleryControls); else loadGalleryControls();
   window.addEventListener('hashchange',()=>setTimeout(loadGalleryControls,50));
 })();
