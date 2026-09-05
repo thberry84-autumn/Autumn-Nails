@@ -1,2 +1,4 @@
 User-agent: *
 Disallow: /
+
+# Studio deployment trigger — private area remains blocked from indexing.
