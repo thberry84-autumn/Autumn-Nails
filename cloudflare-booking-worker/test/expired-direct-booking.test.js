@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { env } from "cloudflare:workers";
-import worker from "../src/index-production.js";
+import worker, { isPastLondonSlot } from "../src/index-production.js";
 
 const site = "https://autumnnails.com";
 
@@ -21,7 +21,26 @@ beforeEach(async () => {
   ]);
 });
 
-describe("direct booking expiry protection", () => {
+describe("London appointment expiry", () => {
+  it("recognises a slot from yesterday as passed", () => {
+    expect(isPastLondonSlot("2020-01-01", "18:00", new Date("2026-09-04T12:00:00Z"))).toBe(true);
+  });
+
+  it("does not mark a future slot as passed", () => {
+    expect(isPastLondonSlot("2099-12-31", "18:00", new Date("2026-09-04T12:00:00Z"))).toBe(false);
+  });
+
+  it("treats the current London minute as passed", () => {
+    const now = new Date("2026-09-04T12:34:56Z");
+    expect(isPastLondonSlot("2026-09-04", "13:34", now)).toBe(true);
+  });
+
+  it("leaves invalid date/time input untouched", () => {
+    const now = new Date("2026-09-04T12:00:00Z");
+    expect(isPastLondonSlot("04-09-2026", "13:00", now)).toBe(false);
+    expect(isPastLondonSlot("2026-09-04", "9:00", now)).toBe(false);
+  });
+
   it("rejects a slot whose start time has already passed today", async () => {
     const now = new Date();
     const parts = Object.fromEntries(new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/London", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(now).filter(part => part.type !== "literal").map(({ type, value }) => [type, value]));
