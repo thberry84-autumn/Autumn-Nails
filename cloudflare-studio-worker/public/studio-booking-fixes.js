@@ -24,7 +24,7 @@
     document.querySelectorAll('input[type="time"]').forEach(input => {
       input.min = MIN_TIME;
       input.max = MAX_TIME;
-      input.step = 900;
+      input.step = 1800;
       if (!input.value || input.value < MIN_TIME || input.value > MAX_TIME) input.value = MIN_TIME;
 
       const wrap = input.closest('.time-picker-wrap');
@@ -34,7 +34,7 @@
       if (!picker) return;
 
       const values = [];
-      for (let mins = 9 * 60; mins <= 22 * 60; mins += 15) {
+      for (let mins = 9 * 60; mins <= 22 * 60; mins += 30) {
         const h = Math.floor(mins / 60);
         const m = mins % 60;
         values.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
