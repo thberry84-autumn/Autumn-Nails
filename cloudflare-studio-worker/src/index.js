@@ -57,26 +57,7 @@ export default {
     if (url.pathname.startsWith("/api/studio/clients/") && url.pathname.endsWith("/history") && request.method === "GET") return await studioClientHistory(url, env);
     if (url.pathname.startsWith("/api/studio/clients/") && request.method === "PATCH") return await studioUpdateClient(url, request, env);
 
-    const response = await env.ASSETS.fetch(request);
-    const contentType = response.headers.get("content-type") || "";
-    if (!contentType.includes("text/html")) return response;
-    const html = await response.text();
-    const calendarMount = '<section id="studioCalendar" class="studio-calendar-shell" aria-label="Weekly calendar"></section>';
-    const withCalendar = html.replace(/<section class="panel"><div class="kicker">Calendar<\/div><h2>Private calendar<\/h2>[\s\S]*?<\/section><\/div>/, `${calendarMount}</div>`);
-    const withoutLegacyStyle = withCalendar.replace(/<style>[\s\S]*?<\/style>/i, "");
-    const withPublicHeaderBehaviour = withoutLegacyStyle
-      .replace('href="#home"><img', 'href="https://autumnnails.com"><img')
-      .replace('</nav><div class="who"', '</nav><button class="menu" aria-label="Open menu" aria-controls="studioTopbar" onclick="document.getElementById(\'studioTopbar\').classList.toggle(\'open\')">☰</button><div class="who"')
-      .replace('<header class="topbar">', '<header class="topbar" id="studioTopbar">');
-    const withoutLegacyFinanceLoad = withPublicHeaderBehaviour
-      .replace("if(name==='finance')loadFinance()", "if(name==='finance')void 0")
-      .replace("if(name==='clients')loadClients()", "if(name==='clients')void 0");
-    const footer = `<footer><div class="wrap footer-grid"><div><a class="brand" href="https://autumnnails.com"><strong>Autumn</strong><span>Nails</span></a><div class="small" style="margin-top:10px">A calm little space for beautiful nails.</div><div class="small" style="margin-top:14px">Studio</div></div><div class="footer-links"><a href="https://autumnnails.com">Customer website</a><a href="https://autumnnails.com/services.html">Services &amp; Booking</a><a href="https://autumnnails.com/gallery.html">Gallery</a><a href="https://autumnnails.com/contact.html">Contact</a></div></div></footer>`;
-    const styles = '<link rel="stylesheet" href="/studio.css?v=20260904i"><link rel="stylesheet" href="/studio-payment-amend.css?v=20260904b">';
-    const scripts = '<script src="/studio-actions.js?v=20260904f"></script><script src="/studio-calendar.js?v=20260904g"></script><script src="/studio-booking-fixes.js?v=20260904g"></script><script src="/studio-finance.js?v=20260904f"></script><script src="/studio-clients.js?v=20260904c"></script><script src="/studio-availability-fix.js?v=20260904a"></script><script>(function(){const clean=()=>document.querySelectorAll("style#studio-polish-css,style:not([id])").forEach(s=>{if(s.id==="studio-polish-css"||s.textContent.includes("#studioCalendar{"))s.remove()});new MutationObserver(clean).observe(document.head,{childList:true});clean()})();</script>';
-    const finalHtml = withoutLegacyFinanceLoad.replace(/<\/head>/i, `${styles}</head>`).replace(/<\/body>/i, `${footer}${scripts}</body>`);
-    const headers = new Headers(response.headers); headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
-    return new Response(finalHtml, { status: response.status, statusText: response.statusText, headers });
+    return env.ASSETS.fetch(request);
   }
 };
 
