@@ -5,6 +5,38 @@
     const button=document.getElementById('addSlot');
     if(button&&!button.dataset.calendarAvailabilityBound&&button.dataset.sameOriginAvailability!=='1'){button.dataset.sameOriginAvailability='1'}
     installEditor();
+    installUkDateFields();
+  };
+
+  const installUkDateFields=()=>{
+    document.querySelectorAll('input[type="date"]:not([data-uk-date-enhanced])').forEach(input=>{
+      input.dataset.ukDateEnhanced='1';
+      input.lang='en-GB';
+      const wrap=document.createElement('div');
+      wrap.className='uk-date-picker-wrap';
+      input.parentNode.insertBefore(wrap,input);
+      wrap.appendChild(input);
+      const display=document.createElement('div');
+      display.className='uk-date-display';
+      wrap.insertBefore(display,input);
+      const format=value=>{
+        if(!value)return '';
+        const parts=value.split('-');
+        if(parts.length!==3)return value;
+        return `${parts[2]}/${parts[1]}/${parts[0].slice(-2)}`;
+      };
+      const sync=()=>{display.textContent=format(input.value)};
+      input.style.position='absolute';
+      input.style.inset='0';
+      input.style.width='100%';
+      input.style.height='100%';
+      input.style.opacity='0';
+      input.style.cursor='pointer';
+      input.style.zIndex='2';
+      input.addEventListener('change',sync);
+      wrap.addEventListener('click',()=>{try{if(typeof input.showPicker==='function')input.showPicker()}catch{}});
+      sync();
+    });
   };
 
   const installEditor=()=>{
@@ -13,6 +45,10 @@
     style.id='studio-availability-editor-style';
     style.textContent=`
       .studio-calendar-key .cal-dot.empty{width:9px!important;height:9px!important;min-width:9px!important;min-height:9px!important;border:1px solid var(--ink2)!important;background:white!important;box-sizing:border-box!important;}
+      .uk-date-picker-wrap{position:relative;width:100%;min-height:48px;}
+      .uk-date-picker-wrap .uk-date-display{width:100%;min-height:48px;box-sizing:border-box;display:flex;align-items:center;padding:13px 14px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.72);color:var(--espresso);}
+      .uk-date-picker-wrap:hover .uk-date-display{border-color:rgba(196,106,43,.35);}
+      .uk-date-picker-wrap:focus-within .uk-date-display{border-color:rgba(196,106,43,.5);box-shadow:0 0 0 3px rgba(196,106,43,.08);}
       #studioAvailabilityEditor{position:fixed;inset:0;z-index:9999;background:rgba(63,42,36,.24);display:flex;align-items:center;justify-content:center;padding:24px;}
       #studioAvailabilityEditor[hidden]{display:none!important;}
       #studioAvailabilityEditor .editor-card{width:min(440px,100%);background:#fffaf6;border:1px solid rgba(100,52,45,.12);border-radius:24px;padding:26px;box-shadow:0 20px 55px rgba(63,42,36,.18);}
@@ -45,6 +81,7 @@
         modal.hidden=true;
         modal.innerHTML=`<div class="editor-card" role="dialog" aria-modal="true" aria-labelledby="studioAvailabilityEditorTitle"><div class="editor-kicker">Edit availability</div><h3 id="studioAvailabilityEditorTitle">Appointment space</h3><div class="editor-date" data-editor-date></div><div class="field"><label for="editorSlotDate">Date</label><input id="editorSlotDate" type="date"></div><div class="field" style="margin-top:14px"><label for="editorSlotTime">Start time</label><input id="editorSlotTime" type="time" min="09:00" max="22:00" step="900"></div><div class="editor-message" data-editor-message></div><div class="editor-actions"><button type="button" class="button" data-editor-save>Update appointment time</button><button type="button" class="button secondary" data-editor-cancel>Cancel</button></div></div>`;
         document.body.appendChild(modal);
+        installUkDateFields();
         modal.addEventListener('click',e=>{if(e.target===modal)closeEditor()});
         modal.querySelector('[data-editor-cancel]').onclick=closeEditor;
         modal.querySelector('[data-editor-save]').onclick=async()=>{
@@ -69,6 +106,7 @@
       modal.querySelector('[data-editor-date]').textContent=`${slot.date||''} · ${String(slot.start_time||'').slice(0,5)}`;
       modal.querySelector('[data-editor-message]').textContent='';
       modal.hidden=false;
+      installUkDateFields();
       modal.querySelector('#editorSlotTime').focus();
     }catch(error){window.alert(error.message||'Could not edit this appointment space.')}
   };
