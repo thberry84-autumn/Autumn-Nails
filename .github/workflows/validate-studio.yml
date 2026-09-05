@@ -84,12 +84,17 @@ jobs:
             studio-booking-fixes.js \
             studio-finance.js \
             studio-clients.js \
-            studio-availability-fix.js \
-            studio-gallery.js \
-            studio-gallery-upload.js; do
+            studio-availability-fix.js; do
             grep -Fq "src=\"/$asset" public/index.html
             test -s "public/$asset"
           done
+          for asset in \
+            studio-gallery.js \
+            studio-gallery-upload.js; do
+            test -s "public/$asset"
+          done
+          grep -Fq "studio-gallery.js" public/studio-finance.js
+          grep -Fq "studio-gallery-upload.js" public/studio-finance.js
 
       - name: Confirm Worker no longer performs HTML surgery
         working-directory: cloudflare-studio-worker
