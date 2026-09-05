@@ -1,6 +1,15 @@
 name: Booking Worker Tests
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "cloudflare-booking-worker/**"
+      - ".github/workflows/test-booking-worker.yml"
+  pull_request:
+    paths:
+      - "cloudflare-booking-worker/**"
+      - ".github/workflows/test-booking-worker.yml"
   workflow_dispatch:
 
 permissions:
@@ -20,8 +29,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Check Worker JavaScript syntax
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Check production Worker JavaScript syntax
         run: |
+          node --check src/index-cancel.js
           node --check src/index-production.js
           node --check src/index-duration.js
           node --check src/index-history.js
@@ -29,5 +41,10 @@ jobs:
           node --check src/index-multi.js
           node --check src/index-snagging.js
           node --check src/index-calendar.js
-          node --check src/index.js
+          node --check src/index-phase4.js
+          node --check src/index-phase3.js
+          node --check src/index-email.js
+          node --check src/index-v2.js
           node --check src/duration-config.js
+      - name: Run Vitest regression suite
+        run: npm test
