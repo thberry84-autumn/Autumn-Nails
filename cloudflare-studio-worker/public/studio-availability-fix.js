@@ -45,8 +45,9 @@
     style.id='studio-availability-editor-style';
     style.textContent=`
       .studio-calendar-key .cal-dot.empty{width:9px!important;height:9px!important;min-width:9px!important;min-height:9px!important;border:1px solid var(--ink2)!important;background:white!important;box-sizing:border-box!important;}
-      .uk-date-picker-wrap{position:relative;width:100%;min-height:44px;height:44px;}
-      .uk-date-picker-wrap .uk-date-display{width:100%;height:44px;min-height:44px;box-sizing:border-box;display:flex;align-items:center;padding:11px 14px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.72);color:var(--espresso);}
+      .uk-date-picker-wrap{position:relative!important;width:100%!important;height:44px!important;min-height:44px!important;max-height:44px!important;box-sizing:border-box!important;}
+      .uk-date-picker-wrap .uk-date-display{display:flex!important;align-items:center!important;width:100%!important;height:44px!important;min-height:44px!important;max-height:44px!important;box-sizing:border-box!important;padding:11px 14px!important;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.72);color:var(--espresso);}
+      .uk-date-picker-wrap input[type="date"]{box-sizing:border-box!important;height:44px!important;max-height:44px!important;}
       .uk-date-picker-wrap:hover .uk-date-display{border-color:rgba(196,106,43,.35);}
       .uk-date-picker-wrap:focus-within .uk-date-display{border-color:rgba(196,106,43,.5);box-shadow:0 0 0 3px rgba(196,106,43,.08);}
       #studioAvailabilityEditor{position:fixed;inset:0;z-index:9999;background:rgba(63,42,36,.24);display:flex;align-items:center;justify-content:center;padding:24px;}
