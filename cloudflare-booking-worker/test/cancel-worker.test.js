@@ -26,8 +26,8 @@ async function seedBooking({ date = futureDate(14), startTime = "18:00" } = {}) 
   const bookingId = crypto.randomUUID();
   await env.DB.prepare("INSERT INTO clients (id,first_name,surname,email,phone,marketing_opt_in,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)")
     .bind(clientId, "Jane", "Smith", "jane@example.com", "07123456789", 0, now, now).run();
-  await env.DB.prepare("INSERT INTO bookings (id,client_id,slot_id,service_id,date,start_time,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)")
-    .bind(bookingId, clientId, slot.meta.last_row_id, "gel-polish", date, startTime, "confirmed", now, now).run();
+  await env.DB.prepare("INSERT INTO bookings (id,client_id,slot_id,service_id,booked_service_id,date,start_time,price_pence,addons_json,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)")
+    .bind(bookingId, clientId, slot.meta.last_row_id, "gel-polish", "gel-polish", date, startTime, 0, "{}", "confirmed", now, now).run();
   return { bookingId, date, startTime, slotId: slot.meta.last_row_id };
 }
 
