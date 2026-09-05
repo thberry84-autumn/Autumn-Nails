@@ -9,7 +9,7 @@
     if(!date||!startTime){if(msg)msg.textContent='Please choose a date and time.';return}
     if(msg)msg.textContent='Releasing…';
     try{
-      const response=await fetch('/api/studio/availability',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',cache:'no-store',body:JSON.stringify({date,startTime,serviceIds:services})});
+      const response=await fetch(`${API}/api/availability`,{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',cache:'no-store',body:JSON.stringify({date,startTime,serviceIds:services})});
       const data=await response.json().catch(()=>({}));
       if(!response.ok)throw new Error(data.error||'Could not release this appointment space.');
       if(msg)msg.textContent='Slot released.';
